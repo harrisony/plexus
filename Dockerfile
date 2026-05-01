@@ -33,7 +33,10 @@ WORKDIR /app
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/plexus-linux ./plexus
 
+EXPOSE 4000
+
 # Environment variables
+ENV PORT=4000
 ENV LOG_LEVEL=info
 ENV DATA_DIR=/app/data
 ENV DATABASE_URL=sqlite:///app/data/plexus.db
