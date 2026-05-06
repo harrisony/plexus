@@ -41,7 +41,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.issue.number,
-              body: '🤔 **Pi is working on it...**\n\nAnalyzing your request and planning next steps.',
+              body: '🤖 **Pi is working on it...**\n\nAnalyzing your request and planning next steps.',
             });
             core.setOutput('comment_id', comment.id);
             core.info(`Posted progress comment: ${comment.id}`);
@@ -99,7 +99,7 @@ jobs:
             Use `update_comment` on that ID for ALL updates — do NOT use `add_issue_comment`.
 
             **Protocol:**
-            1. First update — replace "🤔 Pi is working on it..." with your TODO checklist:
+            1. First update — replace "🤖 Pi is working on it..." with your TODO checklist:
                ```
                update_comment({
                  comment_id: ${{ steps.initial_comment.outputs.comment_id }},
@@ -135,6 +135,32 @@ jobs:
             ## When coding is required
             - Keep changes minimal and focused on the request — do not refactor unrelated code
             - NEVER close the issue or PR — leave it open for the user to close after reviewing
+
+      - name: Post failure comment if agent did not complete
+        if: always() && (steps.pi.outputs.success != 'true' || steps.pi.outputs.response == '')
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: ${{ steps.initial_comment.outputs.comment_id }},
+              body: [
+                '❌ **Pi did not complete successfully.**',
+                '',
+                '| | |',
+                '|---|---|',
+                `| Success | \`${{ steps.pi.outputs.success }}\` |`,
+                `| Duration | ${{ steps.pi.outputs.duration_seconds }}s |`,
+                `| Input tokens | ${{ steps.pi.outputs.input_tokens }} |`,
+                `| Output tokens | ${{ steps.pi.outputs.output_tokens }} |`,
+                '',
+                `[View Actions run](${runUrl}) for details.`,
+                '',
+                'Reply with `/pi` to try again.',
+              ].join('\n'),
+            });
 
       - name: Log agent summary
         if: always()
