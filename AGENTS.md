@@ -145,6 +145,36 @@ Several services are singletons (e.g., `OAuthAuthManager`, `CooldownManager`, `D
 
 ---
 
+## Pi Assistant (AI Agent Workflow)
+
+The `/pi` trigger in issue and PR comments is handled by `.github/workflows/pi-assistant.yml`,
+which invokes `mcowger/pi-coding-agent-action`.
+
+### Prompt file
+
+The agent's system prompt lives at **`.github/prompts/pi-assistant.md`** — edit that file
+to change what the agent is instructed to do. Do not put prompt text inside the workflow YAML.
+
+The prompt file supports `{{dot.notation.path}}` placeholders resolved at runtime against
+two namespaces:
+
+| Namespace | Contents | Example |
+|-----------|----------|---------|
+| `context.*` | The full `@actions/github` context — event payload, actor, SHA, ref, repo, etc. | `{{context.payload.comment.body}}` |
+| `env.*` | All environment variables, including `GITHUB_*` / `RUNNER_*` runner vars and any values passed via the step's `env:` block | `{{env.INITIAL_COMMENT_ID}}` |
+
+Most GitHub context data is available automatically via `context.*`. The only value
+currently passed explicitly via `env:` is `INITIAL_COMMENT_ID`, because it is derived
+from a previous workflow step output and is not part of the event payload.
+
+### Workflow env: block
+
+If a new placeholder is needed that cannot be sourced from `context.*`, add it to the
+`env:` block on the **Run Pi agent** step in `pi-assistant.yml` and reference it as
+`{{env.YOUR_VAR_NAME}}` in the prompt file. Do not add it to any other step.
+
+---
+
 ## Frontend
 
 ### Tailwind CSS v4
