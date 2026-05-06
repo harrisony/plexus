@@ -1,5 +1,12 @@
 name: Build Docker Image
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        type: string
+        description: "The release tag"
+        default: "test"
   workflow_call:
     inputs:
       tag:
