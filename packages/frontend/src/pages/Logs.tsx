@@ -16,6 +16,7 @@ import {
 } from '../lib/api';
 import {
   KWH_PER_SLICE,
+  formatBytes,
   formatCost,
   formatEnergy,
   formatMs,
@@ -154,6 +155,19 @@ export const Logs = () => {
     filtersRef.current = filters;
   }, [filters]);
 
+  interface ProgressUpdate {
+    requestId: string;
+    bytesReceived: number;
+    bytesPerSec: number | null;
+    state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
+    elapsedMs: number;
+  }
+
+  const progressMapRef = useRef<Map<string, ProgressUpdate>>(new Map());
+  // progressTick is incremented to trigger re-renders when progress data changes.
+  // The value itself is intentionally unused; only the setter is called.
+  const [, setProgressTick] = useState(0);
+
   const loadLogs = async () => {
     setLoading(true);
     try {
@@ -270,6 +284,17 @@ export const Logs = () => {
               }
             }
 
+            // Handle progress updates for in-flight requests
+            if (eventType === 'progress' && eventData) {
+              try {
+                const update: ProgressUpdate = JSON.parse(eventData);
+                progressMapRef.current.set(update.requestId, update);
+                setProgressTick((t) => t + 1);
+              } catch {
+                // ignore malformed progress events
+              }
+            }
+
             // Handle different event types: started, updated, completed
             if (
               (eventType === 'started' || eventType === 'updated' || eventType === 'completed') &&
@@ -312,6 +337,10 @@ export const Logs = () => {
                 }
 
                 if (matches) {
+                  // If a completed event arrives, clear any stale progress entry
+                  if (eventType === 'completed') {
+                    progressMapRef.current.delete(newLog.requestId);
+                  }
                   setLogs((prev) => {
                     const existingIndex = prev.findIndex((l) => l.requestId === newLog.requestId);
                     if (existingIndex >= 0) {
@@ -610,7 +639,39 @@ export const Logs = () => {
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
                             Latency
                           </div>
-                          <div className="text-text">{formatMs(log.durationMs)}</div>
+                          <div className="text-text">
+                            {(() => {
+                              const progress =
+                                log.responseStatus === 'pending'
+                                  ? progressMapRef.current.get(log.requestId)
+                                  : undefined;
+                              if (progress) {
+                                return (
+                                  <div
+                                    style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
+                                  >
+                                    <div
+                                      style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                      <CloudDownload size={11} className="text-yellow-400" />
+                                      <span>{formatBytes(progress.bytesReceived)}</span>
+                                    </div>
+                                    {progress.bytesPerSec != null && (
+                                      <span
+                                        style={{
+                                          color: 'var(--color-text-secondary)',
+                                          fontSize: '0.85em',
+                                        }}
+                                      >
+                                        {formatBytes(progress.bytesPerSec)}/s
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return formatMs(log.durationMs);
+                            })()}
+                          </div>
                         </div>
                         <div className="rounded-md bg-bg-subtle p-2">
                           <div className="text-[10px] uppercase tracking-wider text-text-muted">
@@ -1153,29 +1214,61 @@ export const Logs = () => {
                         )}
                       </td>
                       <td className="px-2 py-1.5 text-left border-b border-border-glass text-text align-middle whitespace-nowrap">
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span>Duration: {formatMs(log.durationMs)}</span>
-                          <span
-                            style={{
-                              color: 'var(--color-text-secondary)',
-                              fontSize: '0.85em',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {log.ttftMs && log.ttftMs > 0 ? `TTFT: ${formatMs(log.ttftMs)}` : ''}
-                          </span>
-                          <span
-                            style={{
-                              color: 'var(--color-text-secondary)',
-                              fontSize: '0.85em',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {log.tokensPerSec && log.tokensPerSec > 0
-                              ? `TPS: ${formatTPS(log.tokensPerSec)}`
-                              : ''}
-                          </span>
-                        </div>
+                        {(() => {
+                          const progress =
+                            log.responseStatus === 'pending'
+                              ? progressMapRef.current.get(log.requestId)
+                              : undefined;
+                          if (progress) {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <CloudDownload size={12} className="text-yellow-400" />
+                                  <span style={{ fontSize: '0.9em' }}>
+                                    {formatBytes(progress.bytesReceived)}
+                                  </span>
+                                </div>
+                                {progress.bytesPerSec != null && (
+                                  <span
+                                    style={{
+                                      color: 'var(--color-text-secondary)',
+                                      fontSize: '0.85em',
+                                    }}
+                                  >
+                                    {formatBytes(progress.bytesPerSec)}/s
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          }
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span>Duration: {formatMs(log.durationMs)}</span>
+                              <span
+                                style={{
+                                  color: 'var(--color-text-secondary)',
+                                  fontSize: '0.85em',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {log.ttftMs && log.ttftMs > 0
+                                  ? `TTFT: ${formatMs(log.ttftMs)}`
+                                  : ''}
+                              </span>
+                              <span
+                                style={{
+                                  color: 'var(--color-text-secondary)',
+                                  fontSize: '0.85em',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {log.tokensPerSec && log.tokensPerSec > 0
+                                  ? `TPS: ${formatTPS(log.tokensPerSec)}`
+                                  : ''}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td
                         className="px-2 py-1.5 text-center border-b border-border-glass text-text align-middle"

@@ -9,6 +9,16 @@ import { getCurrentKeyName } from './request-context';
 import { estimateKwhUsed } from './inference-energy';
 import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import type { ModelArchitecture, GpuParams } from '@plexus/shared';
+import type { StallInspector } from './inspectors/stall-inspector';
+
+export interface ProgressUpdate {
+  requestId: string;
+  apiKey: string | null;
+  bytesReceived: number;
+  bytesPerSec: number | null;
+  state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
+  elapsedMs: number;
+}
 
 // ModelArchitecture is now imported from @plexus/shared
 
@@ -54,6 +64,31 @@ export class UsageStorageService extends EventEmitter {
   private schema: any = null;
   private readonly defaultPerformanceRetentionLimit = 100;
   private telemetryQueue: Promise<void> = Promise.resolve();
+  private inFlightRegistry = new Map<
+    string,
+    { inspector: StallInspector; apiKey: string | null }
+  >();
+
+  registerInFlight(requestId: string, inspector: StallInspector, apiKey: string | null): void {
+    this.inFlightRegistry.set(requestId, { inspector, apiKey });
+  }
+
+  deregisterInFlight(requestId: string): void {
+    this.inFlightRegistry.delete(requestId);
+  }
+
+  getProgressUpdates(): ProgressUpdate[] {
+    const updates: ProgressUpdate[] = [];
+    for (const [requestId, { inspector, apiKey }] of this.inFlightRegistry) {
+      try {
+        const stats = inspector.getStats();
+        updates.push({ requestId, apiKey, ...stats });
+      } catch {
+        // Inspector may have been destroyed; skip it
+      }
+    }
+    return updates;
+  }
 
   constructor(connectionString?: string) {
     super();

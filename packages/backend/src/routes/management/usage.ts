@@ -449,7 +449,29 @@ export async function registerUsageRoutes(
     // Also listen for 'created' for backward compatibility
     usageStorage.on('created', completedListener);
 
+    // Periodic progress updates for in-flight requests (every 1s, fire-and-forget)
+    const progressInterval = setInterval(() => {
+      if (reply.raw.destroyed) return;
+      const updates = usageStorage.getProgressUpdates();
+      for (const update of updates) {
+        if (scopeKey && update.apiKey !== scopeKey) continue;
+        try {
+          reply.raw.write(
+            encode({
+              data: JSON.stringify(update),
+              event: 'progress',
+              id: String(Date.now()),
+            })
+          );
+        } catch {
+          // Fire-and-forget: ignore write errors
+        }
+      }
+    }, 1000);
+    progressInterval.unref?.();
+
     request.raw.on('close', () => {
+      clearInterval(progressInterval);
       usageStorage.off('started', startedListener);
       usageStorage.off('updated', updatedListener);
       usageStorage.off('completed', completedListener);

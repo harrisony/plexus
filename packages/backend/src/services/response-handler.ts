@@ -197,6 +197,11 @@ export async function handleResponse(
     const stallInspector = stallDetectionResult?.stallInspector ?? null;
     if (stallInspector) {
       stallInspector.setRequestId(usageRecord.requestId!);
+      usageStorage.registerInFlight(
+        usageRecord.requestId!,
+        stallInspector,
+        (usageRecord.apiKey as string | null) ?? null
+      );
     }
 
     // Pipeline: Source -> StallInspector (if active) -> Usage -> Client
@@ -370,6 +375,9 @@ export async function handleResponse(
         clearInterval(disconnectPoll);
         disconnectPoll = null;
       }
+      if (stallInspector) {
+        usageStorage.deregisterInFlight(usageRecord.requestId!);
+      }
     };
 
     pipeline.once('end', cleanupDisconnectWiring);
@@ -391,7 +399,7 @@ export async function handleResponse(
       ) {
         onDisconnect(isTimeout ? 'pipeline.error.timeout' : 'pipeline.error.' + code);
       }
-      cleanupDisconnectWiring();
+      cleanupDisconnectWiring(); // also deregisters stallInspector
       // Restore debug mode on error
       if (shouldEstimateTokens && !wasDebugEnabled) {
         debugManager.setEnabled(false);

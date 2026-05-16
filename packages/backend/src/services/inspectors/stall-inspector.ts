@@ -257,6 +257,46 @@ export class StallInspector extends PassThrough {
     }
   }
 
+  // ─── Public stats ─────────────────────────────────────────────────
+
+  /**
+   * Return a snapshot of the current throughput state for live progress reporting.
+   * Safe to call from any goroutine — reads only primitive fields.
+   */
+  getStats(): {
+    state: 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED';
+    bytesReceived: number;
+    bytesPerSec: number | null;
+    elapsedMs: number;
+  } {
+    const now = Date.now();
+    let bytesPerSec: number | null = null;
+
+    if (this.samples.length >= 2) {
+      const windowStart = now - this.config.windowMs;
+      // Find oldest sample within the window
+      let oldest = this.samples[0]!;
+      for (let i = 1; i < this.samples.length; i++) {
+        if (this.samples[i]!.timestamp >= windowStart) {
+          oldest = this.samples[i - 1]!;
+          break;
+        }
+      }
+      const bytesInWindow = this.totalBytes - oldest.cumulativeBytes;
+      const timeSpanMs = now - oldest.timestamp;
+      if (timeSpanMs > 0) {
+        bytesPerSec = (bytesInWindow / timeSpanMs) * 1000;
+      }
+    }
+
+    return {
+      state: this.state as 'DISPATCHED' | 'GRACE_PERIOD' | 'MONITORING' | 'THROUGHPUT_STALLED',
+      bytesReceived: this.totalBytes,
+      bytesPerSec,
+      elapsedMs: now - this.startTime,
+    };
+  }
+
   // ─── Cleanup ──────────────────────────────────────────────────────
 
   private cleanup(): void {

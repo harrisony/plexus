@@ -204,6 +204,7 @@ When a provider fails, Plexus removes it from rotation using exponential backoff
 - Client disconnects now cancel the upstream provider request, reducing wasted tokens/quota on abandoned streams.
 - Global and per-provider upstream timeouts cut off requests that run too long.
 - Optional stall detection can fail over slow-to-start providers before bytes reach the client, and can abort streams that become too slow mid-flight.
+- The Request Logs page shows **live bytes received and throughput (KB/s)** for in-flight streaming requests, updated every second via SSE, so you can see whether a provider is actively responding before it completes.
 
 → See [Configuration: Request Timeouts](docs/CONFIGURATION.md#request-timeouts) and [Configuration: Stall Detection](docs/CONFIGURATION.md#stall-detection)
 
