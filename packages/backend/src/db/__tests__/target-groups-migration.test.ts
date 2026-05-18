@@ -1,5 +1,11 @@
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import { closeDatabase, getDatabase, getSchema, initializeDatabase } from '../client';
+import {
+  closeDatabase,
+  getDatabase,
+  getSchema,
+  initializeDatabase,
+  getCurrentDialect,
+} from '../client';
 import { runMigrations } from '../migrate';
 import { eq } from 'drizzle-orm';
 import { ConfigRepository } from '../config-repository';
@@ -17,6 +23,18 @@ describe('migrateLegacyTargetGroups', () => {
     await runMigrations();
     db = getDatabase();
     schema = getSchema();
+    // Ensure extra_body column exists — it's in the Drizzle schema but may not
+    // have a committed migration yet (CI auto-generates migrations after merge).
+    const dialect = getCurrentDialect();
+    try {
+      const alterSql =
+        dialect === 'postgres'
+          ? 'ALTER TABLE model_aliases ADD COLUMN extra_body jsonb'
+          : 'ALTER TABLE model_aliases ADD COLUMN extra_body text';
+      await db.run(alterSql as any);
+    } catch {
+      // Column already exists — that's fine
+    }
     repo = new ConfigRepository();
     // Clean slate for each test
     await db.delete(schema.modelAliasTargets);

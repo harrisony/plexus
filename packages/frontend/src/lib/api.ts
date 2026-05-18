@@ -403,6 +403,7 @@ export interface Alias {
   sticky_session?: boolean;
   preferred_api?: Array<PreferredApiValue>;
   pi_model?: { provider: string; model_id: string };
+  extraBody?: Record<string, any>;
 }
 
 export interface InferenceError {
@@ -1851,6 +1852,8 @@ export const api = {
       ...(alias.pi_model && { pi_model: alias.pi_model }),
       // Model architecture override for inference energy calculation
       ...(alias.model_architecture && { model_architecture: alias.model_architecture }),
+      ...(alias.extraBody &&
+        Object.keys(alias.extraBody).length > 0 && { extraBody: alias.extraBody }),
       target_groups: alias.target_groups.map((g) => ({
         name: g.name,
         selector: g.selector,
@@ -1972,6 +1975,10 @@ export const api = {
           model_architecture: val.model_architecture,
           preferred_api: val.preferred_api || [],
           pi_model: val.pi_model,
+          extraBody:
+            val.extraBody && typeof val.extraBody === 'object' && !Array.isArray(val.extraBody)
+              ? val.extraBody
+              : {},
         });
       });
       return aliases;

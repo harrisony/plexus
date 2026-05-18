@@ -18,6 +18,7 @@ export const modelAliases = sqliteTable('model_aliases', {
   preferredApi: text('preferred_api'), // JSON: ('chat_completions' | 'messages' | 'gemini' | 'responses')[]
   piModel: text('pi_model'), // JSON: { provider: string, model_id: string }
   targetGroups: text('target_groups'), // JSON: {name, selector}[]
+  extraBody: text('extra_body'), // JSON: Record<string, any>
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

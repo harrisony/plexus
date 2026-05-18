@@ -633,6 +633,9 @@ export const ModelConfigSchema = z
         model_id: z.string().min(1),
       })
       .optional(),
+    // Extra body fields merged into every request dispatched through this alias.
+    // Merged after provider-level and model-level extraBody, so alias values win.
+    extraBody: z.record(z.string(), z.any()).optional(),
     // Model architecture override for inference energy calculation
     model_architecture: z
       .object({

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Switch } from '../ui/Switch';
 import { ModelArchitectureEditor } from './ModelArchitectureEditor';
+import { AliasExtraBodyEditor } from './AliasExtraBodyEditor';
 import type { Alias, AliasBehavior } from '../../lib/api';
 
 interface Props {
@@ -135,6 +136,11 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
 
           {/* ── Model Architecture ── */}
           <ModelArchitectureEditor editingAlias={editingAlias} setEditingAlias={setEditingAlias} />
+
+          <div className="h-px bg-border-glass"></div>
+
+          {/* ── Extra Body Fields ── */}
+          <AliasExtraBodyEditor editingAlias={editingAlias} setEditingAlias={setEditingAlias} />
         </div>
       )}
     </div>

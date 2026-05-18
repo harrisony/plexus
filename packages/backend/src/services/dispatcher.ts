@@ -2384,8 +2384,12 @@ export class Dispatcher {
     }
 
     // Apply alias-level advanced behaviors (e.g. strip_adaptive_thinking)
+    // Also merge alias-level extraBody (overrides both provider and model level)
     if (route.canonicalModel) {
       const aliasConfig = getConfig().models?.[route.canonicalModel];
+      if (aliasConfig?.extraBody) {
+        providerPayload = { ...providerPayload, ...aliasConfig.extraBody };
+      }
       if (aliasConfig?.advanced) {
         providerPayload = applyModelBehaviors(providerPayload, aliasConfig.advanced, {
           incomingApiType: request.incomingApiType ?? '',
@@ -2854,6 +2858,14 @@ export class Dispatcher {
           Object.assign(payload, route.config.extraBody);
         }
 
+        // Merge alias-level extraBody (overrides provider level)
+        if (route.canonicalModel) {
+          const aliasConfig = getConfig().models?.[route.canonicalModel];
+          if (aliasConfig?.extraBody) {
+            Object.assign(payload, aliasConfig.extraBody);
+          }
+        }
+
         logger.info(`Dispatching embeddings ${request.model} to ${route.provider}:${route.model}`);
         logger.silly('Embeddings Request Payload', payload);
 
@@ -3309,6 +3321,14 @@ export class Dispatcher {
           Object.assign(payload, route.config.extraBody);
         }
 
+        // Merge alias-level extraBody (overrides provider level)
+        if (route.canonicalModel) {
+          const aliasConfig = getConfig().models?.[route.canonicalModel];
+          if (aliasConfig?.extraBody) {
+            Object.assign(payload, aliasConfig.extraBody);
+          }
+        }
+
         logger.info(`Dispatching speech ${request.model} to ${route.provider}:${route.model}`);
         logger.silly('Speech Request Payload', payload);
 
@@ -3576,6 +3596,14 @@ export class Dispatcher {
 
         if (route.config.extraBody) {
           Object.assign(payload, route.config.extraBody);
+        }
+
+        // Merge alias-level extraBody (overrides provider level)
+        if (route.canonicalModel) {
+          const aliasConfig = getConfig().models?.[route.canonicalModel];
+          if (aliasConfig?.extraBody) {
+            Object.assign(payload, aliasConfig.extraBody);
+          }
         }
 
         logger.info(
