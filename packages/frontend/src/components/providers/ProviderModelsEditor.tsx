@@ -136,6 +136,7 @@ export function ProviderModelsEditor({
   getApiBaseUrlMap,
 }: Props) {
   const [modelAdaptersOpen, setModelAdaptersOpen] = useState<Record<string, boolean>>({});
+  const [modelAdvancedOpen, setModelAdvancedOpen] = useState<Record<string, boolean>>({});
 
   return (
     <div className="border border-border-glass rounded-md">
@@ -314,6 +315,7 @@ export function ProviderModelsEditor({
                               <option value="image">Image</option>
                             </select>
                           </div>
+
                           {(!mCfg.type || mCfg.type === 'chat') && (
                             <div className="flex flex-col gap-1">
                               <label className="font-body text-[11px] font-medium text-text-secondary">
@@ -920,6 +922,77 @@ export function ProviderModelsEditor({
                                 </div>
                               )
                             )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Per-Model Advanced */}
+                      <div className="border border-border-glass rounded-md overflow-hidden">
+                        <div
+                          className="p-2 px-3 flex items-center gap-2 cursor-pointer bg-bg-hover hover:bg-bg-glass"
+                          onClick={() =>
+                            setModelAdvancedOpen((prev) => ({ ...prev, [mId]: !prev[mId] }))
+                          }
+                        >
+                          {modelAdvancedOpen[mId] ? (
+                            <ChevronDown size={14} />
+                          ) : (
+                            <ChevronRight size={14} />
+                          )}
+                          <span className="font-body text-[12px] font-medium text-text-secondary flex-1">
+                            Advanced
+                          </span>
+                          {mCfg.maxConcurrency != null && (
+                            <Badge
+                              status="neutral"
+                              style={{ fontSize: '10px', padding: '2px 8px' }}
+                            >
+                              Concurrency: {mCfg.maxConcurrency}
+                            </Badge>
+                          )}
+                        </div>
+                        {modelAdvancedOpen[mId] && (
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              padding: '8px',
+                              borderTop: '1px solid var(--color-border-glass)',
+                              background: 'var(--color-bg-subtle)',
+                            }}
+                          >
+                            <div className="flex flex-col gap-0.5">
+                              <label className="font-body text-[11px] font-medium text-text-secondary">
+                                Max Concurrency
+                                <span className="font-normal text-[10px] text-text-muted ml-1">
+                                  this model only
+                                </span>
+                              </label>
+                              <input
+                                className={FIELD_CLS}
+                                type="number"
+                                step="1"
+                                min="1"
+                                placeholder="No limit"
+                                value={mCfg.maxConcurrency != null ? mCfg.maxConcurrency : ''}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  if (raw === '') {
+                                    updateModelConfig(mId, { maxConcurrency: undefined });
+                                  } else {
+                                    const val = Number(raw);
+                                    if (Number.isFinite(val) && val >= 1) {
+                                      updateModelConfig(mId, { maxConcurrency: val });
+                                    }
+                                  }
+                                }}
+                              />
+                              <span className="font-body text-[11px] text-text-muted italic">
+                                Limit in-flight requests for this model. Leave empty to use the
+                                provider-wide limit or no limit.
+                              </span>
+                            </div>
                           </div>
                         )}
                       </div>

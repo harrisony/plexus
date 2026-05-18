@@ -73,6 +73,7 @@ const ModelProviderConfigSchema = z.object({
   type: z.enum(['chat', 'responses', 'embeddings', 'transcriptions', 'speech', 'image']).optional(),
   extraBody: z.record(z.string(), z.any()).optional(),
   adapter: AdapterConfigSchema,
+  maxConcurrency: z.number().int().positive().nullable().optional(),
 });
 
 const OAuthProviderSchema = z.enum([
@@ -448,6 +449,7 @@ export const ProviderConfigSchema = z
     geminiThinkingEnabled: z.boolean().optional(),
     adapter: AdapterConfigSchema,
     timeoutMs: z.number().int().positive().optional(),
+    maxConcurrency: z.number().int().positive().nullable().optional(),
     // Per-provider stall detection overrides (null = use global setting)
     stallTtfbMs: z.number().int().min(5000).max(120000).nullable().optional(),
     stallTtfbBytes: z.number().int().min(50).max(10000).nullable().optional(),

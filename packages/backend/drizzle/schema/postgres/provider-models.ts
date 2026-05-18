@@ -23,6 +23,7 @@ export const providerModels = pgTable(
     accessVia: jsonb('access_via'), // string[]
     extraBody: jsonb('extra_body'), // Record<string, any>
     adapter: jsonb('adapter'), // string[] — model-level adapter names
+    maxConcurrency: integer('max_concurrency'), // Max concurrent requests for this model (NULL = no limit)
     sortOrder: integer('sort_order').notNull().default(0),
   },
   (table) => ({

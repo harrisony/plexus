@@ -72,6 +72,7 @@ export const EMPTY_PROVIDER: Provider = {
   models: {},
   adapter: [],
   timeoutMs: undefined,
+  maxConcurrency: undefined,
 };
 
 export interface FetchedModel {

@@ -728,6 +728,36 @@ export function ProviderAdvancedEditor({
                     }}
                   />
                 </div>
+                {/* Max Concurrency */}
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                    Max Concurrency
+                    <span className="font-normal text-[10px] text-text-muted ml-1">
+                      across all models
+                    </span>
+                  </label>
+                  <input
+                    className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    type="number"
+                    step="1"
+                    min="1"
+                    placeholder="No limit"
+                    value={
+                      editingProvider.maxConcurrency != null ? editingProvider.maxConcurrency : ''
+                    }
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        setEditingProvider({ ...editingProvider, maxConcurrency: undefined });
+                      } else {
+                        const val = Number(raw);
+                        if (Number.isFinite(val) && val >= 1) {
+                          setEditingProvider({ ...editingProvider, maxConcurrency: val });
+                        }
+                      }
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>

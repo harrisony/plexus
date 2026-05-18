@@ -21,6 +21,7 @@ import { registerSelfRoutes } from './management/self';
 import { authenticate, requireAdmin, ManagementAuthError } from './management/_principal';
 import { registerModelRoutes } from './management/models';
 import { registerBackupRoutes } from './management/backup';
+import { registerConcurrencyRoutes } from './management/concurrency';
 import { Dispatcher } from '../services/dispatcher';
 import { ProbeService } from '../services/probe-service';
 import { QuotaScheduler } from '../services/quota/quota-scheduler';
@@ -117,6 +118,8 @@ export async function registerManagementRoutes(
       await registerModelRoutes(adminOnly);
       // Backup and restore routes
       await registerBackupRoutes(adminOnly);
+      // Concurrency (live snapshot + historical timeline)
+      await registerConcurrencyRoutes(adminOnly, usageStorage);
     });
   });
 }

@@ -239,6 +239,7 @@ export interface Provider {
   gpu_power_draw_watts?: number;
   adapter?: string[];
   timeoutMs?: number;
+  maxConcurrency?: number | null;
   // Per-provider stall detection overrides
   stallTtfbMs?: number | null;
   stallTtfbBytes?: number | null;
@@ -1677,6 +1678,7 @@ export const api = {
           quotaChecker: normalizeProviderQuotaChecker(val.quota_checker),
           adapter: val.adapter ? (Array.isArray(val.adapter) ? val.adapter : [val.adapter]) : [],
           timeoutMs: val.timeoutMs ?? undefined,
+          maxConcurrency: val.maxConcurrency ?? undefined,
           stallTtfbMs: val.stallTtfbMs ?? undefined,
           stallTtfbBytes: val.stallTtfbBytes ?? undefined,
           stallMinBps: val.stallMinBps ?? undefined,
@@ -1728,6 +1730,7 @@ export const api = {
         : {}),
       ...(provider.adapter && provider.adapter.length > 0 ? { adapter: provider.adapter } : {}),
       ...(provider.timeoutMs != null ? { timeoutMs: provider.timeoutMs } : {}),
+      ...(provider.maxConcurrency != null ? { maxConcurrency: provider.maxConcurrency } : {}),
       ...(provider.stallTtfbMs != null ? { stallTtfbMs: provider.stallTtfbMs } : {}),
       ...(provider.stallTtfbBytes != null ? { stallTtfbBytes: provider.stallTtfbBytes } : {}),
       ...(provider.stallMinBps != null ? { stallMinBps: provider.stallMinBps } : {}),

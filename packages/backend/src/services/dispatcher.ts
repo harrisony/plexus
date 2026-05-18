@@ -35,6 +35,7 @@ import { UsageRecord } from '../types/usage';
 import { calculateCosts } from '../utils/calculate-costs';
 import { resolveModelParams, DEFAULT_GPU_PARAMS } from '@plexus/shared';
 import type { GpuParams, ModelParams } from '@plexus/shared';
+import { ConcurrencyTracker } from './concurrency-tracker';
 
 interface RetryAttemptRecord {
   index: number;
@@ -356,6 +357,21 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        continue;
+      }
+
       // Pre-dispatch context limit enforcement (opt-in per alias). Runs on
       // the finalized per-target request — after any vision fallthrough has
       // expanded the prompt and after cooldown has selected a live target —
@@ -368,6 +384,14 @@ export class Dispatcher {
       }
 
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(currentRequest.requestId, route);
 
@@ -432,6 +456,7 @@ export class Dispatcher {
               route,
               targetApiType
             );
+            doRelease();
             return oauthResponse;
           } catch (oauthError: any) {
             if (signal?.aborted) throw this.buildCancelledError(signal);
@@ -456,10 +481,12 @@ export class Dispatcher {
               logger.warn(
                 `Failover: retrying after OAuth error from ${route.provider}/${route.model}: ${oauthError.message}`
               );
+              doRelease();
               continue;
             }
 
             await this.markOAuthProviderFailure(route, oauthError);
+            doRelease();
             throw oauthError;
           }
         }
@@ -665,6 +692,7 @@ export class Dispatcher {
             this.appendFailureAttempt(retryHistory, route, e, targetApiType, canRetry);
 
             if (canRetry) {
+              doRelease();
               await this.recordAttemptMetric(route, currentRequest.requestId, false, {
                 isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
                 isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
@@ -687,6 +715,7 @@ export class Dispatcher {
               continue;
             }
 
+            doRelease();
             throw e;
           }
         }
@@ -734,9 +763,11 @@ export class Dispatcher {
               logger.warn(
                 `Failover: retrying stream before first byte after ${route.provider}/${route.model} failure: ${error.message}`
               );
+              doRelease();
               continue;
             }
 
+            doRelease();
             throw error;
           }
 
@@ -748,6 +779,43 @@ export class Dispatcher {
             bypassTransformation,
             adapters
           );
+
+          // Wrap the stream to release the concurrency slot when the stream
+          // is fully consumed, cancelled, or errors out. Without this, the
+          // slot would never be released for streaming responses.
+          if (streamResponse.stream) {
+            const originalStream = streamResponse.stream;
+            const reader = originalStream.getReader();
+            let released = false;
+            const release = () => {
+              if (!released) {
+                released = true;
+                reader.releaseLock();
+                doRelease();
+              }
+            };
+            streamResponse.stream = new ReadableStream({
+              async pull(controller) {
+                try {
+                  const { done, value } = await reader.read();
+                  if (done) {
+                    controller.close();
+                    release();
+                  } else {
+                    controller.enqueue(value);
+                  }
+                } catch (e) {
+                  controller.error(e);
+                  release();
+                }
+              },
+              cancel(reason) {
+                release();
+                return originalStream.cancel(reason);
+              },
+            });
+          }
+
           await this.recordAttemptMetric(route, currentRequest.requestId, true, {
             isVisionFallthrough: (currentRequest as any)._hasVisionFallthrough,
             isDescriptorRequest: (currentRequest as any)._isVisionDescriptorRequest,
@@ -795,9 +863,11 @@ export class Dispatcher {
           route,
           targetApiType
         );
+        doRelease();
         return nonStreamingResponse;
       } catch (error: any) {
         lastError = error;
+        doRelease();
 
         // If the client disconnected (abort signal), don't treat this as a
         // retryable error — throw a proper client_disconnected error so the
@@ -2730,7 +2800,31 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`,
+          'embeddings'
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(request.requestId, route);
 
@@ -2843,6 +2937,7 @@ export class Dispatcher {
           route,
           'embeddings'
         );
+        doRelease();
         return enrichedResponse;
       } catch (error: any) {
         lastError = error;
@@ -2870,9 +2965,11 @@ export class Dispatcher {
           logger.warn(
             `Failover: retrying embeddings after network/transport error from ${route.provider}/${route.model}: ${error.message}`
           );
+          doRelease();
           continue;
         }
 
+        doRelease();
         throw this.buildAllTargetsFailedError(lastError, attemptedProviders, retryHistory);
       }
     }
@@ -2927,7 +3024,31 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`,
+          'transcriptions'
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(request.requestId, route);
 
@@ -3050,9 +3171,11 @@ export class Dispatcher {
           route,
           'transcriptions'
         );
+        doRelease();
         return unifiedResponse;
       } catch (error: any) {
         lastError = error;
+        doRelease();
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
         if (error?.routingContext?.statusCode === undefined) {
@@ -3133,7 +3256,31 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`,
+          'speech'
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(request.requestId, route);
 
@@ -3291,9 +3438,11 @@ export class Dispatcher {
           route,
           'speech'
         );
+        doRelease();
         return unifiedResponse;
       } catch (error: any) {
         lastError = error;
+        doRelease();
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
         if (error?.routingContext?.statusCode === undefined) {
@@ -3375,7 +3524,31 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`,
+          'images'
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(request.requestId, route);
 
@@ -3489,9 +3662,11 @@ export class Dispatcher {
           route,
           'images'
         );
+        doRelease();
         return unifiedResponse;
       } catch (error: any) {
         lastError = error;
+        doRelease();
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
         if (error?.routingContext?.statusCode === undefined) {
@@ -3572,7 +3747,31 @@ export class Dispatcher {
         continue;
       }
 
+      // Acquire concurrency slot before upstream request
+      const acquired = ConcurrencyTracker.getInstance().acquire(route.provider, route.model);
+      if (!acquired) {
+        logger.warn(`Skipping ${route.provider}/${route.model} - concurrency limit exceeded`);
+        lastError = new Error(
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`
+        );
+        this.appendSkippedAttempt(
+          retryHistory,
+          route,
+          `Provider ${route.provider}/${route.model} concurrency limit exceeded`,
+          'images'
+        );
+        continue;
+      }
+
       attemptedProviders.push(`${route.provider}/${route.model}`);
+
+      let released = false;
+      const doRelease = () => {
+        if (!released) {
+          released = true;
+          ConcurrencyTracker.getInstance().release(route.provider, route.model);
+        }
+      };
 
       this.emitRoutingUpdate(request.requestId, route);
 
@@ -3685,9 +3884,11 @@ export class Dispatcher {
           route,
           'images'
         );
+        doRelease();
         return unifiedResponse;
       } catch (error: any) {
         lastError = error;
+        doRelease();
         // handleProviderError already called markProviderFailure for HTTP errors.
         // Only call it here for pure network/transport errors (no statusCode).
         if (error?.routingContext?.statusCode === undefined) {

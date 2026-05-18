@@ -55,6 +55,7 @@ export const providers = pgTable(
     stallMinBps: integer('stall_min_bps'), // Minimum bytes per second for throughput stall
     stallWindowMs: integer('stall_window_ms'), // Sliding window width in ms for throughput calculation
     stallGracePeriodMs: integer('stall_grace_period_ms'), // Grace period in ms before throughput enforcement
+    maxConcurrency: integer('max_concurrency'), // Max concurrent requests for this provider (NULL = no limit)
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   },

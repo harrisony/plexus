@@ -10,6 +10,7 @@ import {
 } from '../config';
 import { BackgroundExplorer } from './background-explorer';
 import { CooldownManager } from './cooldown-manager';
+import { ConcurrencyTracker } from './concurrency-tracker';
 import { SelectorFactory } from './selectors/factory';
 import { EnrichedModelTarget } from './selectors/base';
 import { StickySessionManager } from './sticky-session-manager';
@@ -95,6 +96,69 @@ async function filterGroupTargets(
   }
 
   let healthyTargets = [...healthyEligible, ...cooldownExempt];
+
+  if (healthyTargets.length === 0) return [];
+
+  // 2.5 Concurrency filter
+  const concurrencyExempt = healthyTargets.filter((t) => {
+    const providerConfig = config.providers[t.provider];
+    const modelConfig =
+      providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models
+        ? providerConfig.models[t.model]
+        : undefined;
+    return providerConfig?.maxConcurrency == null && modelConfig?.maxConcurrency == null;
+  });
+  const concurrencyEligible = healthyTargets.filter((t) => {
+    const providerConfig = config.providers[t.provider];
+    const modelConfig =
+      providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models
+        ? providerConfig.models[t.model]
+        : undefined;
+    return providerConfig?.maxConcurrency != null || modelConfig?.maxConcurrency != null;
+  });
+
+  const concurrencyHealthy = concurrencyEligible.filter((t) => {
+    const providerConfig = config.providers[t.provider];
+    if (providerConfig?.maxConcurrency != null) {
+      const count = ConcurrencyTracker.getInstance().getProviderCount(t.provider);
+      logger.debug(
+        `Router: concurrency check for ${t.provider}/${t.model}: providerCount=${count}, maxConcurrency=${providerConfig.maxConcurrency}`
+      );
+      if (count >= providerConfig.maxConcurrency) return false;
+    }
+    const modelConfig =
+      providerConfig && !Array.isArray(providerConfig.models) && providerConfig.models
+        ? providerConfig.models[t.model]
+        : undefined;
+    if (modelConfig?.maxConcurrency != null) {
+      const count = ConcurrencyTracker.getInstance().getTargetCount(t.provider, t.model);
+      logger.debug(
+        `Router: concurrency check for ${t.provider}/${t.model}: targetCount=${count}, maxConcurrency=${modelConfig.maxConcurrency}`
+      );
+      if (count >= modelConfig.maxConcurrency) return false;
+    }
+    return true;
+  });
+
+  if (logModelName) {
+    logger.debug(
+      `Router: concurrency filter for '${logModelName}': exempt=[${concurrencyExempt.map((t) => t.provider + '/' + t.model).join(', ')}], eligible=[${concurrencyEligible.map((t) => t.provider + '/' + t.model).join(', ')}], healthy=[${concurrencyHealthy.map((t) => t.provider + '/' + t.model).join(', ')}]`
+    );
+    if (concurrencyHealthy.length < concurrencyEligible.length) {
+      logger.warn(
+        `Router: ${concurrencyEligible.length - concurrencyHealthy.length} target(s) for '${logModelName}' were filtered out due to concurrency limits.`
+      );
+    }
+  }
+
+  // Merge back preserving original order — concurrencyExempt and concurrencyHealthy
+  // are subsets of the original healthyTargets list, so we iterate the original
+  // order and include each target if it appears in either set.
+  const concurrencyExemptSet = new Set(concurrencyExempt);
+  const concurrencyHealthySet = new Set(concurrencyHealthy);
+  healthyTargets = healthyTargets.filter(
+    (t) => concurrencyExemptSet.has(t) || concurrencyHealthySet.has(t)
+  );
 
   if (healthyTargets.length === 0) return [];
 
@@ -490,9 +554,31 @@ export class Router {
       throw error;
     }
 
+    if (providerConfig.maxConcurrency != null) {
+      const count = ConcurrencyTracker.getInstance().getProviderCount(providerId);
+      if (count >= providerConfig.maxConcurrency) {
+        const error = new Error(
+          `Direct routing failed: Concurrency limit exceeded for provider '${providerId}'`
+        ) as any;
+        error.routingContext = { statusCode: 429 };
+        throw error;
+      }
+    }
+
     let modelConfig = undefined;
     if (!Array.isArray(providerConfig.models) && providerConfig.models) {
       modelConfig = providerConfig.models[providerModel];
+    }
+
+    if (modelConfig?.maxConcurrency != null) {
+      const count = ConcurrencyTracker.getInstance().getTargetCount(providerId, providerModel);
+      if (count >= modelConfig.maxConcurrency) {
+        const error = new Error(
+          `Direct routing failed: Concurrency limit exceeded for model '${providerId}/${providerModel}'`
+        ) as any;
+        error.routingContext = { statusCode: 429 };
+        throw error;
+      }
     }
 
     logger.info(`Router: Direct routing to '${providerId}/${providerModel}' (bypassing selector)`);

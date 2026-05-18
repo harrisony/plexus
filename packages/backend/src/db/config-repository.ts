@@ -315,6 +315,7 @@ export class ConfigRepository {
           ? toJson(Array.isArray(config.adapter) ? config.adapter : [config.adapter])
           : null,
       timeoutMs: config.timeoutMs ?? null,
+      maxConcurrency: config.maxConcurrency ?? null,
       // Per-provider stall detection overrides
       stallTtfbMs: config.stallTtfbMs ?? null,
       stallTtfbBytes: config.stallTtfbBytes ?? null,
@@ -377,6 +378,7 @@ export class ConfigRepository {
             cfg.adapter && (Array.isArray(cfg.adapter) ? cfg.adapter.length > 0 : true)
               ? toJson(Array.isArray(cfg.adapter) ? cfg.adapter : [cfg.adapter])
               : null,
+          maxConcurrency: cfg.maxConcurrency ?? null,
           sortOrder: idx,
         }));
         if (modelRows.length > 0) {
@@ -449,6 +451,7 @@ export class ConfigRepository {
             ...(m.accessVia ? { access_via: parseJson(m.accessVia) } : {}),
             ...(m.extraBody ? { extraBody: parseJson(m.extraBody) } : {}),
             ...(m.adapter ? { adapter: parseJson(m.adapter) } : {}),
+            ...(m.maxConcurrency != null ? { maxConcurrency: m.maxConcurrency } : {}),
           };
         }
       } else {
@@ -547,6 +550,7 @@ export class ConfigRepository {
       ...(row.stallMinBps != null ? { stallMinBps: row.stallMinBps } : {}),
       ...(row.stallWindowMs != null ? { stallWindowMs: row.stallWindowMs } : {}),
       ...(row.stallGracePeriodMs != null ? { stallGracePeriodMs: row.stallGracePeriodMs } : {}),
+      ...(row.maxConcurrency != null ? { maxConcurrency: row.maxConcurrency } : {}),
     };
 
     return result as ProviderConfig;
