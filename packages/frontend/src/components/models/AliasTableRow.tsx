@@ -190,8 +190,11 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
                           size="sm"
                           disabled={isProviderDisabled}
                         />
-                        <div className="flex-1 truncate">
-                          {t.provider} &rarr; {t.model}
+                        <div className="flex-1 truncate" title={`${t.provider} → ${t.model}`}>
+                          {t.provider} →{' '}
+                          {t.model.includes('/')
+                            ? `…/${t.model.split('/').slice(1).join('/')}`
+                            : t.model}
                         </div>
                       </div>
                       {testState?.showMessage &&
