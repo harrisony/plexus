@@ -208,16 +208,7 @@ export const Models = () => {
                     Alias
                   </th>
                   <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
                     Aliases
-                  </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Selector
-                  </th>
-                  <th className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
-                    Metadata
                   </th>
                   <th
                     className="px-4 py-3 text-left border-b border-border-glass bg-bg-hover font-semibold text-text-secondary text-[11px] uppercase tracking-wider"
@@ -244,7 +235,7 @@ export const Models = () => {
                 ))}
                 {sortedAliases.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center text-text-muted p-12">
+                    <td colSpan={3} className="text-center text-text-muted p-12">
                       No aliases found
                     </td>
                   </tr>

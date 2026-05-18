@@ -52,9 +52,15 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
             className="flex items-center gap-2 cursor-pointer flex-1"
           >
             <Edit2 size={12} className="opacity-50" />
+            <ModelTypeBadge type={alias.type} />
             {alias.id}
           </div>
           <div className="flex items-center gap-1">
+            {alias.metadata && (
+              <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary capitalize">
+                {alias.metadata.source}
+              </span>
+            )}
             <CopyButton value={alias.id} size="sm" />
             <button
               onClick={() => onDelete(alias)}
@@ -65,9 +71,6 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
             </button>
           </div>
         </div>
-      </td>
-      <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-        <ModelTypeBadge type={alias.type} />
       </td>
       <td className="px-4 py-3 text-left border-b border-border-glass text-text">
         {alias.aliases && alias.aliases.length > 0 ? (
@@ -86,30 +89,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
           <span className="text-text-secondary text-xs">-</span>
         )}
       </td>
-      <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-        <div className="flex flex-col gap-1">
-          {alias.target_groups.map((group) => (
-            <div
-              key={group.name}
-              className="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium border border-border-glass text-text-secondary capitalize"
-              title={`Group: ${group.name}`}
-            >
-              {group.name}: {group.selector}
-            </div>
-          ))}
-        </div>
-      </td>
-      <td className="px-4 py-3 text-left border-b border-border-glass text-text">
-        {alias.metadata ? (
-          <div className="flex items-center gap-1">
-            <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-primary capitalize">
-              {alias.metadata.source}
-            </span>
-          </div>
-        ) : (
-          <span className="text-text-secondary text-xs">-</span>
-        )}
-      </td>
+
       <td className="px-4 py-3 text-left border-b border-border-glass text-text pr-6">
         <div className="flex flex-col gap-2">
           {alias.target_groups.map((group, groupIdx) => (
