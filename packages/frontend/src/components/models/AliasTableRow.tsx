@@ -76,7 +76,7 @@ export const AliasTableRow: React.FC<AliasTableRowProps> = ({
             {alias.aliases.map((a) => (
               <span
                 key={a}
-                className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium border border-border-glass text-text-secondary"
+                className="inline-flex items-center gap-1 text-[10px] text-text-muted w-fit"
               >
                 {a}
                 <CopyButton value={a} size="sm" />
