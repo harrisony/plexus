@@ -1314,38 +1314,13 @@ export const Config = () => {
             </div>
           </Disclosure>
 
-          <Card
-            title="Backup & Restore"
-            extra={
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleFullBackupDownload}
-                  isLoading={isFullBackupLoading}
-                  leftIcon={<Archive size={14} />}
-                >
-                  Full Backup
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleBackupDownload}
-                  isLoading={isBackupLoading}
-                  leftIcon={<HardDrive size={14} />}
-                >
-                  Config Backup
-                </Button>
-              </div>
-            }
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 flex-1 rounded-md border border-warning/30 bg-warning/10 px-3 py-2">
-                <AlertTriangle size={14} className="text-warning shrink-0" />
-                <p className="font-body text-[12px] text-text-muted">
-                  <span className="font-medium text-text">Contains sensitive data</span> — API keys
-                  and OAuth tokens in plaintext. Store securely.
-                </p>
+          <Card title="Backup & Restore">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2 py-1 mr-1">
+                <AlertTriangle size={13} className="text-warning shrink-0" />
+                <span className="font-body text-[11px] text-text-muted">
+                  Sensitive data — store securely
+                </span>
               </div>
               <Button
                 variant="danger"
@@ -1354,17 +1329,34 @@ export const Config = () => {
                 isLoading={isRestoreLoading}
                 leftIcon={<Upload size={14} />}
               >
-                Restore from File…
+                Restore
               </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleFullBackupDownload}
+                isLoading={isFullBackupLoading}
+                leftIcon={<Archive size={14} />}
+              >
+                Full Backup
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleBackupDownload}
+                isLoading={isBackupLoading}
+                leftIcon={<HardDrive size={14} />}
+              >
+                Config Backup
+              </Button>
+              <input
+                ref={restoreInputRef}
+                type="file"
+                accept=".json,.tar.gz,.tgz,application/gzip,application/x-gzip,application/octet-stream"
+                className="hidden"
+                onChange={handleRestoreFileSelect}
+              />
             </div>
-
-            <input
-              ref={restoreInputRef}
-              type="file"
-              accept=".json,.tar.gz,.tgz,application/gzip,application/x-gzip,application/octet-stream"
-              className="hidden"
-              onChange={handleRestoreFileSelect}
-            />
           </Card>
 
           <Card
