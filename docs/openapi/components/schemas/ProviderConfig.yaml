@@ -228,6 +228,17 @@ properties:
         Used for providers that expose reasoning variants as separate model
         names rather than respecting reasoning-related request fields.
 
+      - `reasoning_rewrite` — Declaratively rewrites reasoning/thinking fields
+        in outbound request payloads. Different providers accept reasoning
+        effort via different field names (e.g. `enable_thinking`, `thinking.type`,
+        `chat_template_kwargs.enable_thinking`, `budget_tokens`, `thinking_budget`).
+        This adapter maps from unified fields (e.g. `reasoning.enabled`,
+        `reasoning.effort`) to provider-specific formats. Accepts a `rules`
+        array in options where each rule specifies a `source` dotted path,
+        an optional `when` condition (with `op` and `value`), an array of
+        `rewrites` (each with `target` and `value`), and optional `strip`
+        paths to remove after rewriting.
+
       Pass-through optimisation is automatically disabled when any adapter
       is active.
   timeoutMs:

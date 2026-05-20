@@ -117,6 +117,59 @@ export type ModelOverrideRule = z.infer<typeof ModelOverrideRuleSchema>;
 export type ModelOverrideOptions = z.infer<typeof ModelOverrideOptionsSchema>;
 export type AdapterEntry = z.infer<typeof AdapterEntrySchema>;
 
+// ─── Reasoning Rewrite Adapter Config ────────────────────────────────
+
+const ValueTransformSchema = z.union([
+  z.object({ from: z.literal('source') }),
+  z.object({ from: z.literal('map'), values: z.record(z.string(), z.any()) }),
+  z.object({ from: z.literal('boolean'), truthy: z.any(), falsy: z.any() }),
+]);
+
+const FieldRewriteSchema = z.object({
+  /** Dotted path to write (e.g. "enable_thinking", "thinking.type"). */
+  target: z.string().min(1),
+  /**
+   * Value to write at the target path.
+   * Literal primitives are written as-is.
+   * Objects with { from: "source" | "map" | "boolean" } trigger transforms.
+   */
+  value: z.any(),
+});
+
+const MatchConditionSchema = z.object({
+  /** Comparison operator. */
+  op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'present', 'absent']),
+  /** Value to compare against (for eq/neq/gt/gte/lt/lte). */
+  value: z.any().optional(),
+  /** Values array for "in" operator. */
+  values: z.array(z.any()).optional(),
+});
+
+const ReasoningRewriteRuleSchema = z.object({
+  /** Dotted path to read from the payload (e.g. "reasoning.enabled", "reasoning.effort"). */
+  source: z.string().min(1),
+  /** Optional condition on the source value. Omit = match any (presence check). */
+  when: MatchConditionSchema.optional(),
+  /** Rewrites to apply when the source matches. All matching rewrites apply. */
+  rewrites: z.array(FieldRewriteSchema).min(1),
+  /**
+   * Dotted paths to REMOVE from the payload after rewrites are applied.
+   * Use to strip unified fields the provider doesn't understand
+   * (e.g. "reasoning" when mapping to "enable_thinking" instead).
+   */
+  strip: z.array(z.string().min(1)).optional(),
+});
+
+const ReasoningRewriteOptionsSchema = z.object({
+  rules: z.array(ReasoningRewriteRuleSchema).min(1),
+});
+
+export type ValueTransform = z.infer<typeof ValueTransformSchema>;
+export type FieldRewrite = z.infer<typeof FieldRewriteSchema>;
+export type MatchCondition = z.infer<typeof MatchConditionSchema>;
+export type ReasoningRewriteRule = z.infer<typeof ReasoningRewriteRuleSchema>;
+export type ReasoningRewriteOptions = z.infer<typeof ReasoningRewriteOptionsSchema>;
+
 const ModelProviderConfigSchema = z.object({
   pricing: PricingSchema.default({
     source: 'simple',

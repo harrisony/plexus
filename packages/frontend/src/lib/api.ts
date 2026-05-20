@@ -237,7 +237,7 @@ export interface Provider {
   gpu_bandwidth_tb_s?: number;
   gpu_flops_tflop?: number;
   gpu_power_draw_watts?: number;
-  adapter?: string[];
+  adapter?: any[];
   timeoutMs?: number;
   maxConcurrency?: number | null;
   // Per-provider stall detection overrides
