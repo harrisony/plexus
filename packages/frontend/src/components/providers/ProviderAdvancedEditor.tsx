@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
+import { DebouncedInput } from '../ui/DebouncedInput';
 import { Switch } from '../ui/Switch';
 import { Badge } from '../ui/Badge';
 import { GPU_PROFILE_OPTIONS, resolveGpuParams } from '@plexus/shared';
@@ -25,6 +25,12 @@ export const KNOWN_ADAPTERS: { value: string; label: string; description: string
     description:
       'Conditionally rewrites the model name based on request fields (e.g. switching to a -fast variant when reasoning is disabled).',
   },
+  {
+    value: 'reasoning_rewrite',
+    label: 'Reasoning Rewrite',
+    description:
+      'Rewrites reasoning/thinking fields to provider-specific formats (e.g. enable_thinking, budget_tokens, thinking.type).',
+  },
 ];
 
 interface Props {
@@ -47,31 +53,6 @@ export function ProviderAdvancedEditor({
   const [isHeadersOpen, setIsHeadersOpen] = useState(false);
   const [isExtraBodyOpen, setIsExtraBodyOpen] = useState(false);
   const [isStallOpen, setIsStallOpen] = useState(false);
-
-  // Draft state for stall number inputs — allows free typing without
-  // range-checking on every keystroke. Values are committed to editingProvider
-  // on blur, where we validate the final value.
-  const [stallTtfbDraft, setStallTtfbDraft] = useState<string>(
-    editingProvider.stallTtfbMs != null
-      ? String(Math.round(editingProvider.stallTtfbMs / 1000))
-      : ''
-  );
-  const [stallTtfbBytesDraft, setStallTtfbBytesDraft] = useState<string>(
-    editingProvider.stallTtfbBytes != null ? String(editingProvider.stallTtfbBytes) : ''
-  );
-  const [stallMinBpsDraft, setStallMinBpsDraft] = useState<string>(
-    editingProvider.stallMinBps != null ? String(editingProvider.stallMinBps) : ''
-  );
-  const [stallWindowDraft, setStallWindowDraft] = useState<string>(
-    editingProvider.stallWindowMs != null
-      ? String(Math.round(editingProvider.stallWindowMs / 1000))
-      : ''
-  );
-  const [stallGraceDraft, setStallGraceDraft] = useState<string>(
-    editingProvider.stallGracePeriodMs != null
-      ? String(Math.round(editingProvider.stallGracePeriodMs / 1000))
-      : ''
-  );
 
   return (
     <div className="border border-border-glass rounded-sm overflow-hidden">
@@ -128,7 +109,9 @@ export function ProviderAdvancedEditor({
                   per-model.
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                  {KNOWN_ADAPTERS.filter((a) => a.value !== 'model_override').map((a) => {
+                  {KNOWN_ADAPTERS.filter(
+                    (a) => a.value !== 'model_override' && a.value !== 'reasoning_rewrite'
+                  ).map((a) => {
                     const adapterEntries: any[] = editingProvider.adapter ?? [];
                     const active = adapterEntries.some(
                       (e: any) => (typeof e === 'string' ? e : e.name) === a.value
@@ -245,25 +228,20 @@ export function ProviderAdvancedEditor({
                       TTFB Timeout (s)
                       <span className="font-normal text-[10px] text-text-muted ml-1">5–120</span>
                     </label>
-                    <input
-                      className="w-full py-1.5 pl-3 pr-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    <DebouncedInput
                       type="number"
-                      step="1"
                       placeholder="Global default"
-                      value={stallTtfbDraft}
-                      onChange={(e) => setStallTtfbDraft(e.target.value)}
-                      onBlur={() => {
-                        const num = Number(stallTtfbDraft);
-                        if (stallTtfbDraft === '') {
+                      value={
+                        editingProvider.stallTtfbMs != null
+                          ? String(Math.round(editingProvider.stallTtfbMs / 1000))
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        if (val === '') {
                           setEditingProvider({ ...editingProvider, stallTtfbMs: undefined });
                         } else if (Number.isFinite(num) && num >= 5 && num <= 120) {
                           setEditingProvider({ ...editingProvider, stallTtfbMs: num * 1000 });
-                        } else {
-                          setStallTtfbDraft(
-                            editingProvider.stallTtfbMs != null
-                              ? String(Math.round(editingProvider.stallTtfbMs / 1000))
-                              : ''
-                          );
                         }
                       }}
                     />
@@ -274,25 +252,20 @@ export function ProviderAdvancedEditor({
                       TTFB Byte Threshold
                       <span className="font-normal text-[10px] text-text-muted ml-1">50–10k</span>
                     </label>
-                    <input
-                      className="w-full py-1.5 pl-3 pr-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    <DebouncedInput
                       type="number"
-                      step="1"
                       placeholder="Global default"
-                      value={stallTtfbBytesDraft}
-                      onChange={(e) => setStallTtfbBytesDraft(e.target.value)}
-                      onBlur={() => {
-                        const num = Number(stallTtfbBytesDraft);
-                        if (stallTtfbBytesDraft === '') {
+                      value={
+                        editingProvider.stallTtfbBytes != null
+                          ? String(editingProvider.stallTtfbBytes)
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        if (val === '') {
                           setEditingProvider({ ...editingProvider, stallTtfbBytes: undefined });
                         } else if (Number.isFinite(num) && num >= 50 && num <= 10000) {
                           setEditingProvider({ ...editingProvider, stallTtfbBytes: num });
-                        } else {
-                          setStallTtfbBytesDraft(
-                            editingProvider.stallTtfbBytes != null
-                              ? String(editingProvider.stallTtfbBytes)
-                              : ''
-                          );
                         }
                       }}
                     />
@@ -303,25 +276,20 @@ export function ProviderAdvancedEditor({
                       Min Bytes/Sec
                       <span className="font-normal text-[10px] text-text-muted ml-1">50–5k</span>
                     </label>
-                    <input
-                      className="w-full py-1.5 pl-3 pr-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    <DebouncedInput
                       type="number"
-                      step="1"
                       placeholder="Global default"
-                      value={stallMinBpsDraft}
-                      onChange={(e) => setStallMinBpsDraft(e.target.value)}
-                      onBlur={() => {
-                        const num = Number(stallMinBpsDraft);
-                        if (stallMinBpsDraft === '') {
+                      value={
+                        editingProvider.stallMinBps != null
+                          ? String(editingProvider.stallMinBps)
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        if (val === '') {
                           setEditingProvider({ ...editingProvider, stallMinBps: undefined });
                         } else if (Number.isFinite(num) && num >= 50 && num <= 5000) {
                           setEditingProvider({ ...editingProvider, stallMinBps: num });
-                        } else {
-                          setStallMinBpsDraft(
-                            editingProvider.stallMinBps != null
-                              ? String(editingProvider.stallMinBps)
-                              : ''
-                          );
                         }
                       }}
                     />
@@ -332,25 +300,20 @@ export function ProviderAdvancedEditor({
                       Stall Window (s)
                       <span className="font-normal text-[10px] text-text-muted ml-1">3–30</span>
                     </label>
-                    <input
-                      className="w-full py-1.5 pl-3 pr-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    <DebouncedInput
                       type="number"
-                      step="1"
                       placeholder="Global default"
-                      value={stallWindowDraft}
-                      onChange={(e) => setStallWindowDraft(e.target.value)}
-                      onBlur={() => {
-                        const num = Number(stallWindowDraft);
-                        if (stallWindowDraft === '') {
+                      value={
+                        editingProvider.stallWindowMs != null
+                          ? String(Math.round(editingProvider.stallWindowMs / 1000))
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        if (val === '') {
                           setEditingProvider({ ...editingProvider, stallWindowMs: undefined });
                         } else if (Number.isFinite(num) && num >= 3 && num <= 30) {
                           setEditingProvider({ ...editingProvider, stallWindowMs: num * 1000 });
-                        } else {
-                          setStallWindowDraft(
-                            editingProvider.stallWindowMs != null
-                              ? String(Math.round(editingProvider.stallWindowMs / 1000))
-                              : ''
-                          );
                         }
                       }}
                     />
@@ -361,28 +324,26 @@ export function ProviderAdvancedEditor({
                       Grace Period (s)
                       <span className="font-normal text-[10px] text-text-muted ml-1">0–120</span>
                     </label>
-                    <input
-                      className="w-full py-1.5 pl-3 pr-3 font-body text-sm text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                    <DebouncedInput
                       type="number"
-                      step="1"
                       placeholder="Global default"
-                      value={stallGraceDraft}
-                      onChange={(e) => setStallGraceDraft(e.target.value)}
-                      onBlur={() => {
-                        const num = Number(stallGraceDraft);
-                        if (stallGraceDraft === '') {
-                          setEditingProvider({ ...editingProvider, stallGracePeriodMs: undefined });
+                      value={
+                        editingProvider.stallGracePeriodMs != null
+                          ? String(Math.round(editingProvider.stallGracePeriodMs / 1000))
+                          : ''
+                      }
+                      onChange={(val: string) => {
+                        const num = Number(val);
+                        if (val === '') {
+                          setEditingProvider({
+                            ...editingProvider,
+                            stallGracePeriodMs: undefined,
+                          });
                         } else if (Number.isFinite(num) && num >= 0 && num <= 120) {
                           setEditingProvider({
                             ...editingProvider,
                             stallGracePeriodMs: num * 1000,
                           });
-                        } else {
-                          setStallGraceDraft(
-                            editingProvider.stallGracePeriodMs != null
-                              ? String(Math.round(editingProvider.stallGracePeriodMs / 1000))
-                              : ''
-                          );
                         }
                       }}
                     />
@@ -438,21 +399,20 @@ export function ProviderAdvancedEditor({
                 )}
                 {Object.entries(editingProvider.headers || {}).map(([key, val], idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '6px' }}>
-                    <Input
+                    <DebouncedInput
                       placeholder="Header Name"
                       value={key}
-                      onChange={(e) => updateKV('headers', key, e.target.value, val)}
+                      onChange={(newKey: string) => updateKV('headers', key, newKey, val)}
                       style={{ flex: 1 }}
                     />
-                    <Input
+                    <DebouncedInput
                       placeholder="Value"
                       value={typeof val === 'object' ? JSON.stringify(val) : val}
-                      onChange={(e) => {
-                        const raw = e.target.value;
+                      onChange={(val: string) => {
                         try {
-                          updateKV('headers', key, key, JSON.parse(raw));
+                          updateKV('headers', key, key, JSON.parse(val));
                         } catch {
-                          updateKV('headers', key, key, raw);
+                          updateKV('headers', key, key, val);
                         }
                       }}
                       style={{ flex: 1 }}
@@ -517,21 +477,20 @@ export function ProviderAdvancedEditor({
                 )}
                 {Object.entries(editingProvider.extraBody || {}).map(([key, val], idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '6px' }}>
-                    <Input
+                    <DebouncedInput
                       placeholder="Field Name"
                       value={key}
-                      onChange={(e) => updateKV('extraBody', key, e.target.value, val)}
+                      onChange={(newKey: string) => updateKV('extraBody', key, newKey, val)}
                       style={{ flex: 1 }}
                     />
-                    <Input
+                    <DebouncedInput
                       placeholder="Value"
                       value={typeof val === 'object' ? JSON.stringify(val) : val}
-                      onChange={(e) => {
-                        const raw = e.target.value;
+                      onChange={(val: string) => {
                         try {
-                          updateKV('extraBody', key, key, JSON.parse(raw));
+                          updateKV('extraBody', key, key, JSON.parse(val));
                         } catch {
-                          updateKV('extraBody', key, key, raw);
+                          updateKV('extraBody', key, key, val);
                         }
                       }}
                       style={{ flex: 1 }}

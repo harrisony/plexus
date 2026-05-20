@@ -17,6 +17,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Badge } from '../ui/Badge';
 import { OpenRouterSlugInput } from '../ui/OpenRouterSlugInput';
+import { DebouncedInput } from '../ui/DebouncedInput';
 import type { Provider } from '../../lib/api';
 import { KNOWN_ADAPTERS } from './ProviderAdvancedEditor';
 
@@ -827,7 +828,11 @@ export function ProviderModelsEditor({
                                             {
                                               name: a.value,
                                               options:
-                                                a.value === 'model_override' ? { rules: [] } : {},
+                                                a.value === 'model_override'
+                                                  ? { rules: [] }
+                                                  : a.value === 'reasoning_rewrite'
+                                                    ? { rules: [] }
+                                                    : {},
                                             },
                                           ];
                                       updateModelConfig(mId, {
@@ -923,14 +928,14 @@ export function ProviderModelsEditor({
                                           →
                                         </span>
                                         <div style={{ flex: 1 }}>
-                                          <Input
+                                          <DebouncedInput
                                             placeholder="Rewrite to (e.g. deepseek-r1-fast)"
                                             value={rule.rewriteTo ?? ''}
-                                            onChange={(e: any) => {
+                                            onChange={(val: string) => {
                                               const updated = [...rules];
                                               updated[rIdx] = {
                                                 ...updated[rIdx],
-                                                rewriteTo: e.target.value,
+                                                rewriteTo: val,
                                               };
                                               const newAdapters = modelAdapters.map((entry: any) =>
                                                 typeof entry !== 'string' &&
@@ -1017,15 +1022,15 @@ export function ProviderModelsEditor({
                                           }}
                                         >
                                           <div style={{ flex: 2 }}>
-                                            <Input
+                                            <DebouncedInput
                                               placeholder="e.g. reasoning.enabled"
                                               value={cond.field ?? ''}
-                                              onChange={(e: any) => {
+                                              onChange={(val: string) => {
                                                 const updated = [...rules];
                                                 const newConditions = [...updated[rIdx].conditions];
                                                 newConditions[cIdx] = {
                                                   ...newConditions[cIdx],
-                                                  field: e.target.value,
+                                                  field: val,
                                                 };
                                                 updated[rIdx] = {
                                                   ...updated[rIdx],
@@ -1049,23 +1054,22 @@ export function ProviderModelsEditor({
                                             />
                                           </div>
                                           <div style={{ flex: 1 }}>
-                                            <Input
+                                            <DebouncedInput
                                               placeholder="e.g. false, 0, none"
                                               value={
                                                 cond.value !== undefined ? String(cond.value) : ''
                                               }
-                                              onChange={(e: any) => {
-                                                const raw = e.target.value;
+                                              onChange={(val: string) => {
                                                 const parsed =
-                                                  raw === ''
+                                                  val === ''
                                                     ? undefined
-                                                    : raw === 'true'
+                                                    : val === 'true'
                                                       ? true
-                                                      : raw === 'false'
+                                                      : val === 'false'
                                                         ? false
-                                                        : isNaN(Number(raw))
-                                                          ? raw
-                                                          : Number(raw);
+                                                        : isNaN(Number(val))
+                                                          ? val
+                                                          : Number(val);
                                                 const updated = [...rules];
                                                 const newConditions = [...updated[rIdx].conditions];
                                                 newConditions[cIdx] = {
@@ -1183,6 +1187,725 @@ export function ProviderModelsEditor({
                                 </div>
                               );
                             })()}
+                            /* reasoning_rewrite rules editor */
+                            {(() => {
+                              const modelAdapters: any[] = mCfg.adapter
+                                ? Array.isArray(mCfg.adapter)
+                                  ? mCfg.adapter
+                                  : [mCfg.adapter]
+                                : [];
+                              const rewriteEntry = modelAdapters.find(
+                                (e: any) =>
+                                  (typeof e === 'string' ? e : e.name) === 'reasoning_rewrite'
+                              );
+                              if (!rewriteEntry || typeof rewriteEntry === 'string') return null;
+                              const rules: any[] = rewriteEntry.options?.rules ?? [];
+                              return (
+                                <div
+                                  style={{
+                                    gridColumn: '1 / -1',
+                                    borderTop: '1px solid var(--color-border-glass)',
+                                    marginTop: '4px',
+                                    paddingTop: '6px',
+                                  }}
+                                >
+                                  <div className="font-body text-[11px] font-medium text-text-secondary mb-1">
+                                    Reasoning Rewrite Rules
+                                  </div>
+                                  <div
+                                    className="font-body text-[10px] text-text-muted mb-2"
+                                    style={{ lineHeight: 1.3 }}
+                                  >
+                                    Map unified reasoning fields to provider-specific formats. Each
+                                    rule reads a source field and writes one or more targets.
+                                  </div>
+                                  {rules.map((rule: any, rIdx: number) => (
+                                    <div
+                                      key={rIdx}
+                                      style={{
+                                        border: '1px solid var(--color-border-glass)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        padding: '6px',
+                                        marginBottom: '4px',
+                                        background: 'var(--color-bg-subtle)',
+                                      }}
+                                    >
+                                      {/* Source + When condition */}
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          gap: '4px',
+                                          alignItems: 'center',
+                                          marginBottom: '4px',
+                                        }}
+                                      >
+                                        <div style={{ flex: 2 }}>
+                                          <DebouncedInput
+                                            placeholder="Source (e.g. reasoning.enabled)"
+                                            value={rule.source ?? ''}
+                                            onChange={(val: string) => {
+                                              const updated = [...rules];
+                                              updated[rIdx] = {
+                                                ...updated[rIdx],
+                                                source: val,
+                                              };
+                                              const newAdapters = modelAdapters.map((entry: any) =>
+                                                typeof entry !== 'string' &&
+                                                entry.name === 'reasoning_rewrite'
+                                                  ? {
+                                                      ...entry,
+                                                      options: { ...entry.options, rules: updated },
+                                                    }
+                                                  : entry
+                                              );
+                                              updateModelConfig(mId, { adapter: newAdapters });
+                                            }}
+                                          />
+                                        </div>
+                                        {/* When operator */}
+                                        <div style={{ flex: 0.7 }}>
+                                          <select
+                                            className="w-full py-1 pl-2 pr-2 font-body text-[11px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                                            value={rule.when?.op ?? ''}
+                                            onChange={(e) => {
+                                              const op = e.target.value;
+                                              const updated = [...rules];
+                                              updated[rIdx] = {
+                                                ...updated[rIdx],
+                                                when: op ? { op } : undefined,
+                                              };
+                                              const newAdapters = modelAdapters.map((entry: any) =>
+                                                typeof entry !== 'string' &&
+                                                entry.name === 'reasoning_rewrite'
+                                                  ? {
+                                                      ...entry,
+                                                      options: { ...entry.options, rules: updated },
+                                                    }
+                                                  : entry
+                                              );
+                                              updateModelConfig(mId, { adapter: newAdapters });
+                                            }}
+                                          >
+                                            <option value="">Any (present)</option>
+                                            <option value="eq">Equals</option>
+                                            <option value="neq">Not equals</option>
+                                            <option value="gt">Greater than</option>
+                                            <option value="gte">≥</option>
+                                            <option value="lt">Less than</option>
+                                            <option value="lte">≤</option>
+                                            <option value="in">In list</option>
+                                            <option value="present">Present</option>
+                                            <option value="absent">Absent</option>
+                                          </select>
+                                        </div>
+                                        {/* When value */}
+                                        <div style={{ flex: 1 }}>
+                                          <DebouncedInput
+                                            placeholder="Value"
+                                            value={
+                                              rule.when?.value != null
+                                                ? String(rule.when.value)
+                                                : rule.when?.values
+                                                  ? rule.when.values.join(',')
+                                                  : ''
+                                            }
+                                            onChange={(val: string) => {
+                                              const updated = [...rules];
+                                              const currentWhen = updated[rIdx].when || {};
+                                              if (currentWhen.op === 'in') {
+                                                updated[rIdx] = {
+                                                  ...updated[rIdx],
+                                                  when: {
+                                                    ...currentWhen,
+                                                    values: val
+                                                      .split(',')
+                                                      .map((s: string) => s.trim())
+                                                      .filter(Boolean),
+                                                  },
+                                                };
+                                              } else {
+                                                const parsed =
+                                                  val === ''
+                                                    ? undefined
+                                                    : val === 'true'
+                                                      ? true
+                                                      : val === 'false'
+                                                        ? false
+                                                        : isNaN(Number(val))
+                                                          ? val
+                                                          : Number(val);
+                                                updated[rIdx] = {
+                                                  ...updated[rIdx],
+                                                  when: { ...currentWhen, value: parsed },
+                                                };
+                                              }
+                                              const newAdapters = modelAdapters.map((entry: any) =>
+                                                typeof entry !== 'string' &&
+                                                entry.name === 'reasoning_rewrite'
+                                                  ? {
+                                                      ...entry,
+                                                      options: { ...entry.options, rules: updated },
+                                                    }
+                                                  : entry
+                                              );
+                                              updateModelConfig(mId, { adapter: newAdapters });
+                                            }}
+                                          />
+                                        </div>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            const updated = rules.filter(
+                                              (_: any, i: number) => i !== rIdx
+                                            );
+                                            const newAdapters = modelAdapters.map((entry: any) =>
+                                              typeof entry !== 'string' &&
+                                              entry.name === 'reasoning_rewrite'
+                                                ? {
+                                                    ...entry,
+                                                    options: { ...entry.options, rules: updated },
+                                                  }
+                                                : entry
+                                            );
+                                            updateModelConfig(mId, { adapter: newAdapters });
+                                          }}
+                                          style={{ padding: '4px' }}
+                                        >
+                                          <Trash2
+                                            size={14}
+                                            style={{ color: 'var(--color-danger)' }}
+                                          />
+                                        </Button>
+                                      </div>
+                                      {/* Rewrites */}
+                                      <div className="font-body text-[10px] font-medium text-text-muted mb-1">
+                                        Rewrites
+                                      </div>
+                                      {(rule.rewrites ?? []).map((rw: any, rwIdx: number) => (
+                                        <div
+                                          key={rwIdx}
+                                          style={{
+                                            display: 'flex',
+                                            gap: '4px',
+                                            alignItems: 'center',
+                                            marginBottom: '2px',
+                                            marginLeft: '8px',
+                                          }}
+                                        >
+                                          <div style={{ flex: 2 }}>
+                                            <DebouncedInput
+                                              placeholder="Target path (e.g. enable_thinking)"
+                                              value={rw.target ?? ''}
+                                              onChange={(val: string) => {
+                                                const updated = [...rules];
+                                                const newRewrites = [...updated[rIdx].rewrites];
+                                                newRewrites[rwIdx] = {
+                                                  ...newRewrites[rwIdx],
+                                                  target: val,
+                                                };
+                                                updated[rIdx] = {
+                                                  ...updated[rIdx],
+                                                  rewrites: newRewrites,
+                                                };
+                                                const newAdapters = modelAdapters.map(
+                                                  (entry: any) =>
+                                                    typeof entry !== 'string' &&
+                                                    entry.name === 'reasoning_rewrite'
+                                                      ? {
+                                                          ...entry,
+                                                          options: {
+                                                            ...entry.options,
+                                                            rules: updated,
+                                                          },
+                                                        }
+                                                      : entry
+                                                );
+                                                updateModelConfig(mId, { adapter: newAdapters });
+                                              }}
+                                            />
+                                          </div>
+                                          {/* Value type selector */}
+                                          <div style={{ flex: 0.7 }}>
+                                            <select
+                                              className="w-full py-1 pl-2 pr-2 font-body text-[11px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                                              value={
+                                                rw.value === null
+                                                  ? 'null'
+                                                  : rw.value === undefined
+                                                    ? ''
+                                                    : typeof rw.value !== 'object'
+                                                      ? 'literal'
+                                                      : rw.value.from === 'source'
+                                                        ? 'source'
+                                                        : rw.value.from === 'map'
+                                                          ? 'map'
+                                                          : rw.value.from === 'boolean'
+                                                            ? 'boolean'
+                                                            : 'literal'
+                                              }
+                                              onChange={(e) => {
+                                                const valType = e.target.value;
+                                                let newValue: any;
+                                                switch (valType) {
+                                                  case 'source':
+                                                    newValue = { from: 'source' };
+                                                    break;
+                                                  case 'map':
+                                                    newValue = { from: 'map', values: {} };
+                                                    break;
+                                                  case 'boolean':
+                                                    newValue = {
+                                                      from: 'boolean',
+                                                      truthy: 'enabled',
+                                                      falsy: 'disabled',
+                                                    };
+                                                    break;
+                                                  case 'null':
+                                                    newValue = null;
+                                                    break;
+                                                  default:
+                                                    newValue = '';
+                                                    break;
+                                                }
+                                                const updated = [...rules];
+                                                const newRewrites = [...updated[rIdx].rewrites];
+                                                newRewrites[rwIdx] = {
+                                                  ...newRewrites[rwIdx],
+                                                  value: newValue,
+                                                };
+                                                updated[rIdx] = {
+                                                  ...updated[rIdx],
+                                                  rewrites: newRewrites,
+                                                };
+                                                const newAdapters = modelAdapters.map(
+                                                  (entry: any) =>
+                                                    typeof entry !== 'string' &&
+                                                    entry.name === 'reasoning_rewrite'
+                                                      ? {
+                                                          ...entry,
+                                                          options: {
+                                                            ...entry.options,
+                                                            rules: updated,
+                                                          },
+                                                        }
+                                                      : entry
+                                                );
+                                                updateModelConfig(mId, { adapter: newAdapters });
+                                              }}
+                                            >
+                                              <option value="literal">Literal</option>
+                                              <option value="source">From source</option>
+                                              <option value="map">Value map</option>
+                                              <option value="boolean">Bool map</option>
+                                              <option value="null">null</option>
+                                            </select>
+                                          </div>
+                                          {/* Value input — changes meaning based on type */}
+                                          <div style={{ flex: 1 }}>
+                                            {(() => {
+                                              if (rw.value === null)
+                                                return (
+                                                  <span className="font-body text-[11px] text-text-muted italic">
+                                                    null
+                                                  </span>
+                                                );
+                                              if (rw.value?.from === 'source')
+                                                return (
+                                                  <span className="font-body text-[11px] text-text-muted italic">
+                                                    passthrough
+                                                  </span>
+                                                );
+                                              if (rw.value?.from === 'map') {
+                                                const mapStr = Object.entries(rw.value.values || {})
+                                                  .map(([k, v]) => `${k}:${v}`)
+                                                  .join(', ');
+                                                return (
+                                                  <DebouncedInput
+                                                    placeholder="key:value, key:value"
+                                                    value={mapStr}
+                                                    onChange={(val: string) => {
+                                                      const values: Record<string, any> = {};
+                                                      val.split(',').forEach((pair: string) => {
+                                                        const [k, ...rest] = pair.split(':');
+                                                        const v = rest.join(':').trim();
+                                                        if (k?.trim()) {
+                                                          const numV = Number(v);
+                                                          values[k.trim()] =
+                                                            v === ''
+                                                              ? ''
+                                                              : isNaN(Number(v))
+                                                                ? v
+                                                                : numV;
+                                                        }
+                                                      });
+                                                      const updated = [...rules];
+                                                      const newRewrites = [
+                                                        ...updated[rIdx].rewrites,
+                                                      ];
+                                                      newRewrites[rwIdx] = {
+                                                        ...newRewrites[rwIdx],
+                                                        value: { from: 'map', values },
+                                                      };
+                                                      updated[rIdx] = {
+                                                        ...updated[rIdx],
+                                                        rewrites: newRewrites,
+                                                      };
+                                                      const newAdapters = modelAdapters.map(
+                                                        (entry: any) =>
+                                                          typeof entry !== 'string' &&
+                                                          entry.name === 'reasoning_rewrite'
+                                                            ? {
+                                                                ...entry,
+                                                                options: {
+                                                                  ...entry.options,
+                                                                  rules: updated,
+                                                                },
+                                                              }
+                                                            : entry
+                                                      );
+                                                      updateModelConfig(mId, {
+                                                        adapter: newAdapters,
+                                                      });
+                                                    }}
+                                                  />
+                                                );
+                                              }
+                                              if (rw.value?.from === 'boolean') {
+                                                return (
+                                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                                    <DebouncedInput
+                                                      placeholder="If true"
+                                                      value={String(rw.value.truthy ?? '')}
+                                                      onChange={(val: string) => {
+                                                        const updated = [...rules];
+                                                        const newRewrites = [
+                                                          ...updated[rIdx].rewrites,
+                                                        ];
+                                                        newRewrites[rwIdx] = {
+                                                          ...newRewrites[rwIdx],
+                                                          value: {
+                                                            ...newRewrites[rwIdx].value,
+                                                            truthy: val,
+                                                          },
+                                                        };
+                                                        updated[rIdx] = {
+                                                          ...updated[rIdx],
+                                                          rewrites: newRewrites,
+                                                        };
+                                                        const newAdapters = modelAdapters.map(
+                                                          (entry: any) =>
+                                                            typeof entry !== 'string' &&
+                                                            entry.name === 'reasoning_rewrite'
+                                                              ? {
+                                                                  ...entry,
+                                                                  options: {
+                                                                    ...entry.options,
+                                                                    rules: updated,
+                                                                  },
+                                                                }
+                                                              : entry
+                                                        );
+                                                        updateModelConfig(mId, {
+                                                          adapter: newAdapters,
+                                                        });
+                                                      }}
+                                                    />
+                                                    <DebouncedInput
+                                                      placeholder="If false"
+                                                      value={String(rw.value.falsy ?? '')}
+                                                      onChange={(val: string) => {
+                                                        const updated = [...rules];
+                                                        const newRewrites = [
+                                                          ...updated[rIdx].rewrites,
+                                                        ];
+                                                        newRewrites[rwIdx] = {
+                                                          ...newRewrites[rwIdx],
+                                                          value: {
+                                                            ...newRewrites[rwIdx].value,
+                                                            falsy: val,
+                                                          },
+                                                        };
+                                                        updated[rIdx] = {
+                                                          ...updated[rIdx],
+                                                          rewrites: newRewrites,
+                                                        };
+                                                        const newAdapters = modelAdapters.map(
+                                                          (entry: any) =>
+                                                            typeof entry !== 'string' &&
+                                                            entry.name === 'reasoning_rewrite'
+                                                              ? {
+                                                                  ...entry,
+                                                                  options: {
+                                                                    ...entry.options,
+                                                                    rules: updated,
+                                                                  },
+                                                                }
+                                                              : entry
+                                                        );
+                                                        updateModelConfig(mId, {
+                                                          adapter: newAdapters,
+                                                        });
+                                                      }}
+                                                    />
+                                                  </div>
+                                                );
+                                              }
+                                              // Literal value
+                                              return (
+                                                <DebouncedInput
+                                                  placeholder="Literal value"
+                                                  value={String(rw.value ?? '')}
+                                                  onChange={(val: string) => {
+                                                    const parsed =
+                                                      val === 'true'
+                                                        ? true
+                                                        : val === 'false'
+                                                          ? false
+                                                          : isNaN(Number(val))
+                                                            ? val
+                                                            : Number(val);
+                                                    const updated = [...rules];
+                                                    const newRewrites = [...updated[rIdx].rewrites];
+                                                    newRewrites[rwIdx] = {
+                                                      ...newRewrites[rwIdx],
+                                                      value: parsed,
+                                                    };
+                                                    updated[rIdx] = {
+                                                      ...updated[rIdx],
+                                                      rewrites: newRewrites,
+                                                    };
+                                                    const newAdapters = modelAdapters.map(
+                                                      (entry: any) =>
+                                                        typeof entry !== 'string' &&
+                                                        entry.name === 'reasoning_rewrite'
+                                                          ? {
+                                                              ...entry,
+                                                              options: {
+                                                                ...entry.options,
+                                                                rules: updated,
+                                                              },
+                                                            }
+                                                          : entry
+                                                    );
+                                                    updateModelConfig(mId, {
+                                                      adapter: newAdapters,
+                                                    });
+                                                  }}
+                                                />
+                                              );
+                                            })()}
+                                          </div>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              const updated = [...rules];
+                                              const newRewrites = updated[rIdx].rewrites.filter(
+                                                (_: any, i: number) => i !== rwIdx
+                                              );
+                                              updated[rIdx] = {
+                                                ...updated[rIdx],
+                                                rewrites: newRewrites,
+                                              };
+                                              const newAdapters = modelAdapters.map((entry: any) =>
+                                                typeof entry !== 'string' &&
+                                                entry.name === 'reasoning_rewrite'
+                                                  ? {
+                                                      ...entry,
+                                                      options: { ...entry.options, rules: updated },
+                                                    }
+                                                  : entry
+                                              );
+                                              updateModelConfig(mId, { adapter: newAdapters });
+                                            }}
+                                            style={{ padding: '4px' }}
+                                          >
+                                            <Trash2
+                                              size={12}
+                                              style={{ color: 'var(--color-danger)' }}
+                                            />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          const updated = [...rules];
+                                          updated[rIdx] = {
+                                            ...updated[rIdx],
+                                            rewrites: [
+                                              ...(updated[rIdx].rewrites ?? []),
+                                              { target: '', value: '' },
+                                            ],
+                                          };
+                                          const newAdapters = modelAdapters.map((entry: any) =>
+                                            typeof entry !== 'string' &&
+                                            entry.name === 'reasoning_rewrite'
+                                              ? {
+                                                  ...entry,
+                                                  options: { ...entry.options, rules: updated },
+                                                }
+                                              : entry
+                                          );
+                                          updateModelConfig(mId, { adapter: newAdapters });
+                                        }}
+                                        style={{ marginLeft: '8px', padding: '2px 6px' }}
+                                      >
+                                        <Plus size={12} />{' '}
+                                        <span className="font-body text-[10px]">Rewrite</span>
+                                      </Button>
+                                      {/* Strip paths */}
+                                      <div
+                                        style={{
+                                          borderTop: '1px solid var(--color-border-glass)',
+                                          margin: '6px 0 4px 0',
+                                        }}
+                                      />
+                                      <div className="font-body text-[10px] font-medium text-text-muted mb-1">
+                                        Strip paths (remove from payload after rewrite)
+                                      </div>
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          gap: '4px',
+                                          marginLeft: '8px',
+                                          flexWrap: 'wrap',
+                                        }}
+                                      >
+                                        {(rule.strip ?? []).map(
+                                          (stripPath: string, sIdx: number) => (
+                                            <div
+                                              key={sIdx}
+                                              style={{
+                                                display: 'flex',
+                                                gap: '2px',
+                                                alignItems: 'center',
+                                              }}
+                                            >
+                                              <div
+                                                className="font-body text-[11px] text-text"
+                                                style={{
+                                                  padding: '2px 8px',
+                                                  background: 'var(--color-bg-glass)',
+                                                  border: '1px solid var(--color-border-glass)',
+                                                  borderRadius: 'var(--radius-sm)',
+                                                }}
+                                              >
+                                                {stripPath}
+                                              </div>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                  const updated = [...rules];
+                                                  const newStrip = updated[rIdx].strip.filter(
+                                                    (_: any, i: number) => i !== sIdx
+                                                  );
+                                                  updated[rIdx] = {
+                                                    ...updated[rIdx],
+                                                    strip:
+                                                      newStrip.length > 0 ? newStrip : undefined,
+                                                  };
+                                                  const newAdapters = modelAdapters.map(
+                                                    (entry: any) =>
+                                                      typeof entry !== 'string' &&
+                                                      entry.name === 'reasoning_rewrite'
+                                                        ? {
+                                                            ...entry,
+                                                            options: {
+                                                              ...entry.options,
+                                                              rules: updated,
+                                                            },
+                                                          }
+                                                        : entry
+                                                  );
+                                                  updateModelConfig(mId, { adapter: newAdapters });
+                                                }}
+                                                style={{ padding: '2px' }}
+                                              >
+                                                <Trash2
+                                                  size={10}
+                                                  style={{ color: 'var(--color-danger)' }}
+                                                />
+                                              </Button>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          gap: '4px',
+                                          marginLeft: '8px',
+                                          marginTop: '2px',
+                                        }}
+                                      >
+                                        <Input
+                                          placeholder="Path to strip (e.g. reasoning) — press Enter"
+                                          onKeyDown={(e: any) => {
+                                            if (e.key === 'Enter') {
+                                              const draft = (
+                                                e.target as HTMLInputElement
+                                              ).value.trim();
+                                              if (draft) {
+                                                const updated = [...rules];
+                                                updated[rIdx] = {
+                                                  ...updated[rIdx],
+                                                  strip: [...(updated[rIdx].strip ?? []), draft],
+                                                };
+                                                const newAdapters = modelAdapters.map(
+                                                  (entry: any) =>
+                                                    typeof entry !== 'string' &&
+                                                    entry.name === 'reasoning_rewrite'
+                                                      ? {
+                                                          ...entry,
+                                                          options: {
+                                                            ...entry.options,
+                                                            rules: updated,
+                                                          },
+                                                        }
+                                                      : entry
+                                                );
+                                                updateModelConfig(mId, { adapter: newAdapters });
+                                                (e.target as HTMLInputElement).value = '';
+                                              }
+                                            }
+                                          }}
+                                          style={{ flex: 1, fontSize: '11px' }}
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                      const newRule = {
+                                        source: '',
+                                        rewrites: [{ target: '', value: '' }],
+                                      };
+                                      const updated = [...rules, newRule];
+                                      const newAdapters = modelAdapters.map((entry: any) =>
+                                        typeof entry !== 'string' &&
+                                        entry.name === 'reasoning_rewrite'
+                                          ? {
+                                              ...entry,
+                                              options: { ...entry.options, rules: updated },
+                                            }
+                                          : entry
+                                      );
+                                      updateModelConfig(mId, { adapter: newAdapters });
+                                    }}
+                                    style={{ marginTop: '2px' }}
+                                  >
+                                    <Plus size={12} />{' '}
+                                    <span className="font-body text-[10px]">Rule</span>
+                                  </Button>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -1241,23 +1964,24 @@ export function ProviderModelsEditor({
                             {Object.entries(mCfg.extraBody || {}).map(
                               ([key, val]: [string, any], idx: number) => (
                                 <div key={idx} style={{ display: 'flex', gap: '6px' }}>
-                                  <Input
+                                  <DebouncedInput
                                     placeholder="Field Name"
                                     value={key}
-                                    onChange={(e) => updateModelKV(mId, key, e.target.value, val)}
+                                    onChange={(newKey: string) =>
+                                      updateModelKV(mId, key, newKey, val)
+                                    }
                                     style={{ flex: 1 }}
                                   />
-                                  <Input
+                                  <DebouncedInput
                                     placeholder="Value"
                                     value={
                                       typeof val === 'object' ? JSON.stringify(val) : String(val)
                                     }
-                                    onChange={(e) => {
-                                      const raw = e.target.value;
+                                    onChange={(val: string) => {
                                       try {
-                                        updateModelKV(mId, key, key, JSON.parse(raw));
+                                        updateModelKV(mId, key, key, JSON.parse(val));
                                       } catch {
-                                        updateModelKV(mId, key, key, raw);
+                                        updateModelKV(mId, key, key, val);
                                       }
                                     }}
                                     style={{ flex: 1 }}
