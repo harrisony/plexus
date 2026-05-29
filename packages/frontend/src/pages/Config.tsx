@@ -12,6 +12,7 @@ import {
   Shield,
   Save,
   Radar,
+  Trash2,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { formatMinutesToMinSec } from '@plexus/shared';
@@ -130,6 +131,7 @@ export const Config = () => {
   const [isBackupLoading, setIsBackupLoading] = useState(false);
   const [isFullBackupLoading, setIsFullBackupLoading] = useState(false);
   const [isRestoreLoading, setIsRestoreLoading] = useState(false);
+  const [isResetLogsLoading, setIsResetLogsLoading] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement>(null);
 
   // Failover settings state
@@ -778,6 +780,27 @@ export const Config = () => {
     }
   };
 
+  const handleResetLogs = async () => {
+    const ok = await toast.confirm({
+      title: 'Reset All Logs?',
+      message:
+        'This will **permanently delete all request logs, error logs, and debug trace logs**. Configuration, cooldowns, and settings will not be touched. This action cannot be undone. Are you sure?',
+      confirmLabel: 'Reset Logs',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    setIsResetLogsLoading(true);
+    try {
+      const res = await api.resetLogs();
+      toast.success(res.message || 'All logs have been reset successfully');
+    } catch (e) {
+      toast.error((e as Error).message, 'Failed to reset logs');
+    } finally {
+      setIsResetLogsLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
@@ -1348,6 +1371,15 @@ export const Config = () => {
                 leftIcon={<HardDrive size={14} />}
               >
                 Config Backup
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleResetLogs}
+                isLoading={isResetLogsLoading}
+                leftIcon={<Trash2 size={14} />}
+              >
+                Reset All Logs
               </Button>
               <input
                 ref={restoreInputRef}
