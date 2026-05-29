@@ -3063,6 +3063,18 @@ export const api = {
     return res.json();
   },
 
+  /** Reset all request logs, error logs, and debug trace logs. */
+  resetLogs: async (): Promise<{ success: boolean; message: string }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/logs/reset`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Reset logs failed' }));
+      throw new Error(err.error || 'Reset logs failed');
+    }
+    return res.json();
+  },
+
   // ─── Failover Settings ────────────────────────────────────────────
 
   /** Fetch current failover policy. */
