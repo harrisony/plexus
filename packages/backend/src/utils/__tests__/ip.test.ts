@@ -3,12 +3,16 @@ import { getClientIp, getTrustedClientIp } from '../ip';
 import { FastifyRequest } from 'fastify';
 
 // Helper to create a mock Fastify Request
-function createMockRequest(headers: Record<string, string>, ip?: string): FastifyRequest {
+function createMockRequest(
+  headers: Record<string, string>,
+  ip?: string,
+  remoteAddress = ip
+): FastifyRequest {
   return {
     headers: headers,
     ip: ip || undefined,
     socket: {
-      remoteAddress: ip || undefined,
+      remoteAddress: remoteAddress || undefined,
     },
   } as unknown as FastifyRequest;
 }
@@ -101,6 +105,11 @@ describe('getTrustedClientIp', () => {
 
   test('ignores the header when the peer is not a trusted proxy (anti-spoof)', () => {
     expect(getTrustedClientIp(reqFromLoopback(), ['10.0.0.0/8'])).toBe('127.0.0.1');
+  });
+
+  test('uses socket remoteAddress before request.ip for the proxy trust gate', () => {
+    const req = createMockRequest({ 'x-forwarded-for': '10.1.2.3' }, '10.0.0.9', '203.0.113.9');
+    expect(getTrustedClientIp(req, ['10.0.0.0/8'])).toBe('203.0.113.9');
   });
 
   test('trusted peer with a real proxy address resolves the forwarded client', () => {

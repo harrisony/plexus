@@ -55,6 +55,15 @@ export function attachKeyAccessPolicy<T extends { metadata?: Record<string, any>
   };
 }
 
+export function isRequestIpAllowed(
+  request: FastifyRequest,
+  allowedIps: string[] | undefined,
+  trustedProxies: string[] | undefined
+): boolean {
+  const clientIp = getTrustedClientIp(request, trustedProxies);
+  return isIpAllowed(clientIp, allowedIps);
+}
+
 export function createAuthHook() {
   return {
     onRequest: async (request: FastifyRequest) => {
@@ -123,8 +132,9 @@ export function createAuthHook() {
           // the standard 401 auth_error, which deliberately does not reveal that
           // the key is valid-but-used-from-a-disallowed-IP.
           const keyCfg = entry[1] as { allowedIps?: string[] };
-          const clientIp = getTrustedClientIp(req as FastifyRequest, getConfig().trustedProxies);
-          if (!isIpAllowed(clientIp, keyCfg.allowedIps)) {
+          if (
+            !isRequestIpAllowed(req as FastifyRequest, keyCfg.allowedIps, config.trustedProxies)
+          ) {
             logger.silly(`Auth FAILED - client IP not in allowlist for key: ${entry[0]}`);
             return false;
           }

@@ -70,7 +70,7 @@ export function getClientIp(request: FastifyRequest): string | null {
  * `trustedProxies` semantics (distinct from per-key allowlists, where empty
  * means "no restriction"):
  *   - undefined        → not configured ⇒ trust all headers (legacy getClientIp)
- *   - contains 0.0.0.0/0 (the UI default) ⇒ every hop is trusted
+ *   - default trust-all list ['0.0.0.0/0', '::/0'] ⇒ every hop is trusted
  *   - []               → trust no peers ⇒ forwarding headers are ignored
  *   - specific entries → only peers/hops matching them are trusted
  */
@@ -82,7 +82,7 @@ export function getTrustedClientIp(
   if (trustedProxies === undefined) return getClientIp(request);
 
   const rules = trustedProxies.map((r) => r.trim()).filter(Boolean);
-  const peer = request.ip || request.socket?.remoteAddress || null;
+  const peer = request.socket?.remoteAddress || request.ip || null;
 
   // No trusted proxies configured → never believe forwarding headers.
   if (rules.length === 0) return peer;

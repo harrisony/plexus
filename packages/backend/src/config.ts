@@ -892,7 +892,12 @@ export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   quotas: QuotaConfig[];
   mcpServers?: Record<string, McpServerConfig>;
   // Immediate-peer IPs/CIDRs whose forwarding headers are trusted when
-  // resolving the client IP. Undefined = trust all (legacy); see getTrustedClientIp.
+  // resolving the client IP. Semantics:
+  //  - undefined: legacy trust-all before DB-backed config is loaded
+  //  - ['0.0.0.0/0', '::/0']: explicit trust-all database default
+  //  - []: trust no proxies, use peer IP only
+  //  - specific CIDRs: trust only matching peers
+  // See getTrustedClientIp for enforcement.
   trustedProxies?: string[];
 };
 export type DatabaseConfig = {

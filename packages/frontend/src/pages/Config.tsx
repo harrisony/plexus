@@ -1411,9 +1411,10 @@ export const Config = () => {
                   onChange={setTrustedProxies}
                 />
                 <p className="text-xs text-text-muted mt-2">
-                  Type entries separated by spaces. <code>0.0.0.0/0</code> (the default) trusts all
-                  proxies — keep this only if Plexus is not publicly reachable except through your
-                  proxy. An empty list trusts no proxies. Accepts IPv4/IPv6, CIDR, and ranges.
+                  Type entries separated by spaces. The default trust-all list is{' '}
+                  <code>0.0.0.0/0</code> plus <code>::/0</code> — keep this only if Plexus is not
+                  publicly reachable except through your proxy. An empty list trusts no proxies.
+                  Accepts IPv4/IPv6, CIDR, and ranges.
                 </p>
               </div>
             </div>

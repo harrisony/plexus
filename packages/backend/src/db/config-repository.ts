@@ -1281,7 +1281,7 @@ export class ConfigRepository {
   }
 
   async getTrustedProxies(): Promise<string[]> {
-    return this.getSetting<string[]>('trustedProxies', ['0.0.0.0/0']);
+    return this.getSetting<string[]>('trustedProxies', ['0.0.0.0/0', '::/0']);
   }
 
   async getBackgroundExplorationConfig(): Promise<BackgroundExplorationConfig> {
