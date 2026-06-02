@@ -891,6 +891,9 @@ export type PlexusConfig = z.infer<typeof RawPlexusConfigSchema> & {
   stall?: StallConfigType;
   quotas: QuotaConfig[];
   mcpServers?: Record<string, McpServerConfig>;
+  // Immediate-peer IPs/CIDRs whose forwarding headers are trusted when
+  // resolving the client IP. Undefined = trust all (legacy); see getTrustedClientIp.
+  trustedProxies?: string[];
 };
 export type DatabaseConfig = {
   connectionString: string;

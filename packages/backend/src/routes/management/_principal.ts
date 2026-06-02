@@ -2,7 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
 import { logger } from '../../utils/logger';
 import { getConfig } from '../../config';
-import { getClientIp } from '../../utils/ip';
+import { getTrustedClientIp } from '../../utils/ip';
 import { isIpAllowed } from '../../utils/ip-match';
 
 /**
@@ -106,7 +106,7 @@ export async function resolvePrincipal(request: FastifyRequest): Promise<Princip
     };
     // Enforce the key's IP allowlist for the management API too, so a wrong-IP
     // key can neither call inference nor administer.
-    if (!isIpAllowed(getClientIp(request), cfg.allowedIps)) {
+    if (!isIpAllowed(getTrustedClientIp(request, config.trustedProxies), cfg.allowedIps)) {
       logger.silly(`Rejected limited key ${matched.name} - client IP not in allowlist`);
       return null;
     }

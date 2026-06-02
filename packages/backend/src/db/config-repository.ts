@@ -1280,6 +1280,10 @@ export class ConfigRepository {
     return { initialMinutes, maxMinutes };
   }
 
+  async getTrustedProxies(): Promise<string[]> {
+    return this.getSetting<string[]>('trustedProxies', ['0.0.0.0/0']);
+  }
+
   async getBackgroundExplorationConfig(): Promise<BackgroundExplorationConfig> {
     const enabled = await this.getSetting<boolean>('backgroundExploration.enabled', false);
     const stalenessThresholdSeconds = await this.getSetting<number>(

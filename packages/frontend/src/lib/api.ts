@@ -3144,6 +3144,29 @@ export const api = {
     return res.json();
   },
 
+  // ─── Trusted Proxies ───────────────────────────────────────────────
+
+  /** Fetch the trusted-proxy allowlist (IPs/CIDRs whose forwarding headers are honored). */
+  getTrustedProxies: async (): Promise<{ trustedProxies: string[] }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/trusted-proxies`);
+    if (!res.ok) throw new Error('Failed to fetch trusted proxies');
+    return res.json();
+  },
+
+  /** Replace the trusted-proxy allowlist. */
+  patchTrustedProxies: async (trustedProxies: string[]): Promise<{ trustedProxies: string[] }> => {
+    const res = await fetchWithAuth(`${API_BASE}/v0/management/config/trusted-proxies`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trustedProxies }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update trusted proxies');
+    }
+    return res.json();
+  },
+
   // ─── Exploration Rate Settings ─────────────────────────────────────
 
   /** Fetch current exploration rate settings. */
