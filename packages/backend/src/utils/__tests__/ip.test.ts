@@ -135,4 +135,12 @@ describe('getTrustedClientIp', () => {
     );
     expect(getTrustedClientIp(req, ['127.0.0.0/8', '10.0.0.0/8'])).toBe('8.8.8.8');
   });
+
+  test('all-trusted chain returns the right-most (appended) hop, not a forged prefix', () => {
+    // A broad 0.0.0.0/0 trust list makes every hop "trusted". An attacker
+    // prepends a spoofed IP; the trusted proxy appends the real connection IP
+    // on the right, so that right-most value is what must be returned.
+    const req = createMockRequest({ 'x-forwarded-for': '1.2.3.4, 66.66.66.66' }, '127.0.0.1');
+    expect(getTrustedClientIp(req, ['0.0.0.0/0'])).toBe('66.66.66.66');
+  });
 });

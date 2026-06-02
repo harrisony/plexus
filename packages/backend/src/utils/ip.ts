@@ -103,8 +103,11 @@ export function getTrustedClientIp(
       const hop = chain[i]!;
       if (!isIpAllowed(hop, rules)) return hop;
     }
-    // Every hop is a trusted proxy → fall back to the left-most claimed address.
-    if (chain.length > 0) return chain[0]!;
+    // Every hop is a trusted proxy (e.g. a broad 0.0.0.0/0 / ::/0 trust list).
+    // Return the right-most entry — the address the immediate trusted proxy
+    // appended from the real connection — rather than the left-most, which a
+    // client can forge by prepending it to X-Forwarded-For.
+    if (chain.length > 0) return chain[chain.length - 1]!;
   }
 
   // No X-Forwarded-For from the trusted proxy → the peer is the best we have.

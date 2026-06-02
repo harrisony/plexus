@@ -12,12 +12,10 @@
  *
  * Semantics used by isIpAllowed():
  *   - empty allowlist          → allow all (no restriction)
- *   - allowlist has 0.0.0.0/0  → allow all, any family (canonical "allow all"
- *                                default; keeps the default from locking out
- *                                IPv6 clients)
- *   - otherwise                → the client must fall inside a same-family rule;
- *                                if the client IP can't be parsed, deny
- *                                (fail-closed)
+ *   - otherwise                → the client must fall inside a same-family rule.
+ *                                0.0.0.0/0 covers all IPv4 and ::/0 all IPv6, so
+ *                                "allow all" requires both. An IP that can't be
+ *                                parsed is denied (fail-closed).
  */
 
 type Family = 4 | 6;
@@ -228,13 +226,13 @@ export function isValidIpRule(rule: string): boolean {
 
 /**
  * Decide whether a client IP is permitted by an allowlist. See the module
- * header for the full semantics (empty = allow all, 0.0.0.0/0 = allow all,
- * otherwise same-family containment with fail-closed on unparseable client IP).
+ * header for the full semantics (empty = allow all; otherwise same-family
+ * containment — 0.0.0.0/0 = all IPv4, ::/0 = all IPv6 — with fail-closed on an
+ * unparseable client IP).
  */
 export function isIpAllowed(clientIp: string | null | undefined, allowlist?: string[]): boolean {
   const rules = (allowlist ?? []).map((r) => r.trim()).filter(Boolean);
   if (rules.length === 0) return true; // no restriction
-  if (rules.includes('0.0.0.0/0')) return true; // canonical allow-all default
 
   const client = normalizeClientIp(clientIp);
   if (!client) return false; // fail-closed: restricted key, unknown client IP

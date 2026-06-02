@@ -127,9 +127,10 @@ export const Keys = () => {
 
   const handleAddNewKey = () => {
     setOriginalKeyName(null);
-    // New keys default to an open allowlist (0.0.0.0/0 = allow all). Existing
-    // keys are loaded as-stored, so an empty allowlist stays empty.
-    setEditingKey({ ...EMPTY_KEY, allowedIps: ['0.0.0.0/0'] });
+    // New keys default to an open allowlist. 0.0.0.0/0 covers all IPv4 and ::/0
+    // all IPv6, so both are needed for "allow all". Existing keys are loaded
+    // as-stored, so an empty allowlist stays empty.
+    setEditingKey({ ...EMPTY_KEY, allowedIps: ['0.0.0.0/0', '::/0'] });
     setIsKeyModalOpen(true);
   };
 
@@ -988,9 +989,9 @@ export const Keys = () => {
               }
             />
             <p className="text-xs text-text-muted -mt-1">
-              Optional allowlist. Type entries separated by spaces. Empty or <code>0.0.0.0/0</code>{' '}
-              means allow all. Accepts IPv4/IPv6, CIDR (e.g. <code>10.0.0.0/8</code>), and ranges
-              (e.g. <code>10.1.0.10-20</code>).
+              Optional allowlist. Type entries separated by spaces. Empty means allow all;{' '}
+              <code>0.0.0.0/0</code> is all IPv4 and <code>::/0</code> all IPv6. Accepts IPv4/IPv6,
+              CIDR (e.g. <code>10.0.0.0/8</code>), and ranges (e.g. <code>10.1.0.10-20</code>).
             </p>
 
             <div className="flex flex-col gap-2">

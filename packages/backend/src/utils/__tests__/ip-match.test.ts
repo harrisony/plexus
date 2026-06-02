@@ -65,10 +65,11 @@ describe('isIpAllowed', () => {
     expect(isIpAllowed(null, [])).toBe(true);
   });
 
-  test('0.0.0.0/0 allows everything, including IPv6', () => {
+  test('0.0.0.0/0 covers all IPv4; ::/0 is required for IPv6', () => {
     expect(isIpAllowed('8.8.8.8', ['0.0.0.0/0'])).toBe(true);
-    expect(isIpAllowed('2001:db8::1', ['0.0.0.0/0'])).toBe(true);
-    expect(isIpAllowed('2001:db8::1', ['10.0.0.0/8', '0.0.0.0/0'])).toBe(true);
+    expect(isIpAllowed('2001:db8::1', ['0.0.0.0/0'])).toBe(false); // IPv4 all-CIDR ≠ IPv6
+    expect(isIpAllowed('2001:db8::1', ['0.0.0.0/0', '::/0'])).toBe(true);
+    expect(isIpAllowed('8.8.8.8', ['0.0.0.0/0', '::/0'])).toBe(true);
   });
 
   test('single IPv4 match', () => {
