@@ -4,6 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { SearchInput } from '../components/ui/SearchInput';
+import { Select } from '../components/ui/Select';
 import { CostToolTip } from '../components/ui/CostToolTip';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
@@ -192,6 +193,7 @@ export const Logs = () => {
     provider: '',
     startDate: '',
     endDate: '',
+    responseStatus: '',
   });
 
   const apiLogos: Record<string, string> = {
@@ -277,6 +279,7 @@ export const Logs = () => {
       if (filters.provider) cleanFilters.provider = filters.provider;
       if (filters.startDate) cleanFilters.startDate = new Date(filters.startDate).toISOString();
       if (filters.endDate) cleanFilters.endDate = new Date(filters.endDate).toISOString();
+      if (filters.responseStatus) cleanFilters.responseStatus = filters.responseStatus;
 
       const res = await api.getLogs(limit, offset, cleanFilters, sortBy, sortDir);
       setLogs(res.data);
@@ -450,6 +453,12 @@ export const Logs = () => {
                 if (
                   currentFilters.provider &&
                   !newLog.provider?.toLowerCase().includes(currentFilters.provider.toLowerCase())
+                ) {
+                  matches = false;
+                }
+                if (
+                  currentFilters.responseStatus &&
+                  newLog.responseStatus !== currentFilters.responseStatus
                 ) {
                   matches = false;
                 }
@@ -711,6 +720,20 @@ export const Logs = () => {
               placeholder="Filter by provider…"
               value={filters.provider}
               onChange={(v) => setFilters({ ...filters, provider: v })}
+            />
+          </div>
+          <div className="w-full sm:w-36">
+            <Select
+              value={filters.responseStatus}
+              onChange={(v) => setFilters({ ...filters, responseStatus: v })}
+              options={[
+                { value: '', label: 'All statuses' },
+                { value: 'success', label: 'Success' },
+                { value: 'error', label: 'Error' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'cancelled', label: 'Cancelled' },
+                { value: 'timeout', label: 'Timeout' },
+              ]}
             />
           </div>
           <div className="w-full sm:w-auto flex items-center gap-2">
