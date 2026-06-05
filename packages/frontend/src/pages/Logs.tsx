@@ -199,6 +199,10 @@ export const Logs = () => {
     antigravity: antigravityLogo,
     chat: chatLogo,
     gemini: geminiLogo,
+    // inference-v2 (pi-ai) outgoing API types
+    'google-generative-ai': geminiLogo,
+    'openai-completions': chatLogo,
+    'anthropic-messages': messagesLogo,
   };
 
   // Delete Modal State
@@ -1139,7 +1143,8 @@ export const Logs = () => {
                                 <Volume2 size={16} className="text-orange-500" />
                               ) : log.outgoingApiType === 'images' ? (
                                 <ImageIcon size={16} className="text-fuchsia-500" />
-                              ) : log.outgoingApiType === 'responses' ? (
+                              ) : log.outgoingApiType === 'responses' ||
+                                log.outgoingApiType === 'openai-responses' ? (
                                 <MessagesSquare size={16} className="text-cyan-500" />
                               ) : log.outgoingApiType === 'oauth' ? (
                                 <ShieldCheck size={16} className="text-emerald-500" />
