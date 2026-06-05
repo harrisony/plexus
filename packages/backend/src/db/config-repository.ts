@@ -355,6 +355,7 @@ export class ConfigRepository {
           : null,
       timeoutMs: config.timeoutMs ?? null,
       maxConcurrency: config.maxConcurrency ?? null,
+      piAiProvider: config.pi_ai_provider ?? null,
       // Per-provider stall detection overrides
       stallTtfbMs: config.stallTtfbMs ?? null,
       stallTtfbBytes: config.stallTtfbBytes ?? null,
@@ -418,6 +419,7 @@ export class ConfigRepository {
               ? toJson(cfg.adapter)
               : null,
           maxConcurrency: cfg.maxConcurrency ?? null,
+          piAiModelId: cfg.pi_ai_model_id ?? null,
           sortOrder: idx,
         }));
         if (modelRows.length > 0) {
@@ -537,6 +539,7 @@ export class ConfigRepository {
             ...(m.extraBody ? { extraBody: parseJson(m.extraBody) } : {}),
             ...(m.adapter ? { adapter: normalizeAdapterEntries(parseJson(m.adapter)) } : {}),
             ...(m.maxConcurrency != null ? { maxConcurrency: m.maxConcurrency } : {}),
+            ...(m.piAiModelId != null ? { pi_ai_model_id: m.piAiModelId } : {}),
           };
         }
       } else {
@@ -641,6 +644,7 @@ export class ConfigRepository {
       ...(row.stallWindowMs != null ? { stallWindowMs: row.stallWindowMs } : {}),
       ...(row.stallGracePeriodMs != null ? { stallGracePeriodMs: row.stallGracePeriodMs } : {}),
       ...(row.maxConcurrency != null ? { maxConcurrency: row.maxConcurrency } : {}),
+      ...(row.piAiProvider != null ? { pi_ai_provider: row.piAiProvider } : {}),
     };
 
     return result as ProviderConfig;

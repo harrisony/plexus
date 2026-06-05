@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { DebouncedInput } from '../ui/DebouncedInput';
@@ -6,6 +6,7 @@ import { Switch } from '../ui/Switch';
 import { Badge } from '../ui/Badge';
 import { GPU_PROFILE_OPTIONS, resolveGpuParams } from '@plexus/shared';
 import type { Provider } from '../../lib/api';
+import { api } from '../../lib/api';
 
 export const KNOWN_ADAPTERS: { value: string; label: string; description: string }[] = [
   {
@@ -53,6 +54,27 @@ export function ProviderAdvancedEditor({
   const [isHeadersOpen, setIsHeadersOpen] = useState(false);
   const [isExtraBodyOpen, setIsExtraBodyOpen] = useState(false);
   const [isStallOpen, setIsStallOpen] = useState(false);
+
+  // pi-ai provider dropdown
+  const [piProviders, setPiProviders] = useState<string[]>([]);
+  const [piProviderCustom, setPiProviderCustom] = useState(false);
+
+  useEffect(() => {
+    api
+      .getPiProviders()
+      .then(setPiProviders)
+      .catch(() => {
+        /* non-fatal — falls back to custom text input */
+      });
+  }, []);
+
+  // Determine if the current value is already a known provider or needs custom mode
+  useEffect(() => {
+    const val = editingProvider.pi_ai_provider;
+    if (val && piProviders.length > 0 && !piProviders.includes(val)) {
+      setPiProviderCustom(true);
+    }
+  }, [editingProvider.pi_ai_provider, piProviders]);
 
   return (
     <div className="border border-border-glass rounded-sm overflow-hidden">
@@ -778,6 +800,62 @@ export function ProviderAdvancedEditor({
                       }
                     }}
                   />
+                </div>
+                {/* pi-ai Provider */}
+                <div className="flex flex-col gap-0.5">
+                  <label className="font-body text-[11px] font-medium text-text-secondary">
+                    pi-ai Provider
+                  </label>
+                  {!piProviderCustom ? (
+                    <select
+                      className="w-full py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                      value={editingProvider.pi_ai_provider ?? ''}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw === '__custom__') {
+                          setPiProviderCustom(true);
+                          return;
+                        }
+                        setEditingProvider({
+                          ...editingProvider,
+                          pi_ai_provider: raw || undefined,
+                        });
+                      }}
+                    >
+                      <option value="">— none —</option>
+                      {piProviders.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                      <option value="__custom__">custom...</option>
+                    </select>
+                  ) : (
+                    <div className="flex gap-1">
+                      <input
+                        className="flex-1 py-1 pl-2 pr-2 font-body text-[12px] text-text bg-bg-glass border border-border-glass rounded-sm outline-none focus:border-primary"
+                        type="text"
+                        placeholder="e.g. anthropic, openai"
+                        value={editingProvider.pi_ai_provider ?? ''}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setEditingProvider({
+                            ...editingProvider,
+                            pi_ai_provider: raw || undefined,
+                          });
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        className="font-body text-[11px] text-text-muted hover:text-text px-1"
+                        title="Back to list"
+                        onClick={() => setPiProviderCustom(false)}
+                      >
+                        ↩
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
