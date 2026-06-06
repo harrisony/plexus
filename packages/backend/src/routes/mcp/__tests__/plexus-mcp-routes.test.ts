@@ -121,7 +121,7 @@ describe('Plexus management MCP routes', () => {
       },
     });
 
-    await registerMcpRoutes(fastify, mockMcpUsageStorage, mockUsageStorage);
+    await registerMcpRoutes(fastify, mockMcpUsageStorage);
     await fastify.ready();
   });
 

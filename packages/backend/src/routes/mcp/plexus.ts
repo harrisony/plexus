@@ -3,15 +3,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { getConfig, type PlexusConfig } from '../../config';
 import { logger } from '../../utils/logger';
 import { ConfigService } from '../../services/config-service';
-import { UsageStorageService } from '../../services/usage-storage';
-import { getCurrentDialect, getSchema } from '../../db/client';
-import { DebugManager } from '../../services/debug-manager';
-import { BackupService } from '../../services/backup-service';
-import { CooldownManager } from '../../services/cooldown-manager';
 import { McpUsageStorageService } from '../../services/mcp-proxy/mcp-usage-storage';
 import { getClientIp } from '../../utils/ip';
 import { ManagementAuthError, authenticate, requireAdmin } from '../management/_principal';
@@ -142,8 +136,7 @@ class McpToolError extends Error {
 
 export async function registerPlexusMcpRoutes(
   fastify: FastifyInstance,
-  mcpUsageStorage: McpUsageStorageService,
-  usageStorage?: UsageStorageService
+  mcpUsageStorage: McpUsageStorageService
 ) {
   fastify.register(async (plexusMcp) => {
     plexusMcp.setErrorHandler(async (error, _request, reply) => {
@@ -175,13 +168,13 @@ export async function registerPlexusMcpRoutes(
     plexusMcp.addHook('preHandler', requireAdmin);
 
     plexusMcp.post('/mcp/plexus', (request, reply) =>
-      handlePlexusMcpRequest(request, reply, mcpUsageStorage, usageStorage)
+      handlePlexusMcpRequest(request, reply, mcpUsageStorage)
     );
     plexusMcp.get('/mcp/plexus', (request, reply) =>
-      handlePlexusMcpRequest(request, reply, mcpUsageStorage, usageStorage)
+      handlePlexusMcpRequest(request, reply, mcpUsageStorage)
     );
     plexusMcp.delete('/mcp/plexus', (request, reply) =>
-      handlePlexusMcpRequest(request, reply, mcpUsageStorage, usageStorage)
+      handlePlexusMcpRequest(request, reply, mcpUsageStorage)
     );
   });
 }
@@ -189,8 +182,7 @@ export async function registerPlexusMcpRoutes(
 async function handlePlexusMcpRequest(
   request: FastifyRequest,
   reply: FastifyReply,
-  mcpUsageStorage: McpUsageStorageService,
-  usageStorage?: UsageStorageService
+  mcpUsageStorage: McpUsageStorageService
 ) {
   const startTime = Date.now();
   const requestId = crypto.randomUUID();
@@ -215,7 +207,7 @@ async function handlePlexusMcpRequest(
 
   // The SDK server owns one active transport at a time. A singleton would need
   // close/reconnect queueing, so stateless per-request servers are simpler and safer.
-  const server = createPlexusMcpServer(shimContext, usageStorage);
+  const server = createPlexusMcpServer(shimContext);
   const transport = new WebStandardStreamableHTTPServerTransport({
     enableJsonResponse: true,
     sessionIdGenerator: undefined,
@@ -257,10 +249,7 @@ async function handlePlexusMcpRequest(
   }
 }
 
-function createPlexusMcpServer(
-  shimContext: ManagementShimContext,
-  usageStorage?: UsageStorageService
-) {
+function createPlexusMcpServer(shimContext: ManagementShimContext) {
   const server = new McpServer(
     {
       name: 'plexus-management',
@@ -318,8 +307,7 @@ function createPlexusMcpServer(
         description: getToolDescription(toolName),
         inputSchema: ToolInputSchema,
       },
-      async (input) =>
-        toToolResult(await handleToolCall(toolName, input as ToolInput, shimContext, usageStorage))
+      async (input) => toToolResult(await handleToolCall(toolName, input as ToolInput, shimContext))
     );
   }
 
@@ -329,8 +317,7 @@ function createPlexusMcpServer(
 async function handleToolCall(
   toolName: (typeof TOOL_NAMES)[number],
   input: ToolInput,
-  shimContext: ManagementShimContext,
-  usageStorage?: UsageStorageService
+  shimContext: ManagementShimContext
 ) {
   try {
     if (DESTRUCTIVE_OPERATIONS.has(input.operation)) {
@@ -610,248 +597,6 @@ async function handleOperationsTool(
         'reset_logs',
       ]);
   }
-}
-
-async function getUsageSummary(usageStorage: UsageStorageService, query: Record<string, unknown>) {
-  const range = asOptionalString(query.range) ?? 'day';
-  const startDateStr = asOptionalString(query.startDate);
-  const endDateStr = asOptionalString(query.endDate);
-
-  if (range === 'custom') {
-    if (!startDateStr || !endDateStr) {
-      throw new McpToolError(
-        'startDate and endDate are required for custom range',
-        'invalid_request',
-        400
-      );
-    }
-    const startDate = new Date(startDateStr);
-    const endDate = new Date(endDateStr);
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      throw new McpToolError('Invalid date format', 'invalid_request', 400);
-    }
-    if (endDate < startDate) {
-      throw new McpToolError('endDate must be after startDate', 'invalid_request', 400);
-    }
-  } else if (!['hour', 'day', 'week', 'month'].includes(range)) {
-    throw new McpToolError('Invalid range', 'invalid_request', 400);
-  }
-
-  const now = new Date();
-  now.setSeconds(0, 0);
-  let rangeStart = new Date(now);
-  let rangeEnd = new Date(now);
-
-  if (range === 'custom' && startDateStr && endDateStr) {
-    rangeStart = new Date(startDateStr);
-    rangeEnd = new Date(endDateStr);
-  } else {
-    switch (range as 'hour' | 'day' | 'week' | 'month') {
-      case 'hour':
-        rangeStart.setHours(rangeStart.getHours() - 1);
-        break;
-      case 'day':
-        rangeStart.setHours(rangeStart.getHours() - 24);
-        break;
-      case 'week':
-        rangeStart.setDate(rangeStart.getDate() - 7);
-        break;
-      case 'month':
-        rangeStart.setDate(rangeStart.getDate() - 30);
-        break;
-    }
-  }
-
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
-  const statsStart = new Date(now);
-  statsStart.setDate(statsStart.getDate() - 7);
-
-  let stepSeconds = 60;
-  if (range === 'custom') {
-    const durationMs = rangeEnd.getTime() - rangeStart.getTime();
-    const durationMinutes = durationMs / (1000 * 60);
-    const durationSeconds = durationMs / 1000;
-
-    if (durationMinutes <= 30) stepSeconds = 60;
-    else if (durationMinutes <= 24 * 60) stepSeconds = 300;
-    else if (durationMinutes <= 7 * 24 * 60) stepSeconds = 3600;
-    else stepSeconds = 21600;
-
-    const maxBuckets = 100;
-    const calculatedBuckets = Math.ceil(durationSeconds / stepSeconds);
-    if (calculatedBuckets > maxBuckets) {
-      stepSeconds = Math.ceil(durationSeconds / maxBuckets);
-    }
-  } else {
-    switch (range) {
-      case 'hour':
-        stepSeconds = 60;
-        break;
-      case 'day':
-        stepSeconds = 3600;
-        break;
-      case 'week':
-      case 'month':
-        stepSeconds = 86400;
-        break;
-    }
-  }
-
-  const db = usageStorage.getDb();
-  const schema = getSchema();
-  const dialect = getCurrentDialect();
-  const stepMs = stepSeconds * 1000;
-  const nowMs = now.getTime();
-  const rangeStartMs = rangeStart.getTime();
-  const rangeEndMs = rangeEnd.getTime();
-  const statsStartMs = statsStart.getTime();
-  const todayStartMs = todayStart.getTime();
-  const stepMsLiteral = sql.raw(String(stepMs));
-  const bucketStartMs =
-    dialect === 'sqlite'
-      ? sql<number>`CAST((CAST(${schema.requestUsage.startTime} AS INTEGER) / ${stepMsLiteral}) * ${stepMsLiteral} AS INTEGER)`
-      : sql<number>`FLOOR(${schema.requestUsage.startTime}::double precision / ${stepMsLiteral}) * ${stepMsLiteral}`;
-
-  const apiKey = asOptionalString(query.apiKey);
-  const keyFilter = apiKey ? eq(schema.requestUsage.apiKey, apiKey) : undefined;
-
-  const toNumber = (value: unknown) => (value === null || value === undefined ? 0 : Number(value));
-
-  const seriesRows = await db
-    .select({
-      bucketStartMs,
-      requests: sql<number>`COUNT(*)`,
-      inputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensInput}), 0)`,
-      outputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
-      cachedTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
-      cacheWriteTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
-      kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
-    })
-    .from(schema.requestUsage)
-    .where(
-      and(
-        gte(schema.requestUsage.startTime, rangeStartMs),
-        lte(schema.requestUsage.startTime, rangeEndMs),
-        ...(keyFilter ? [keyFilter] : [])
-      )
-    )
-    .groupBy(bucketStartMs)
-    .orderBy(bucketStartMs);
-
-  const statsRows = await db
-    .select({
-      requests: sql<number>`COUNT(*)`,
-      inputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensInput}), 0)`,
-      outputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
-      cachedTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
-      cacheWriteTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
-      kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
-      avgDurationMs: sql<number>`COALESCE(AVG(${schema.requestUsage.durationMs}), 0)`,
-      totalDurationMs: sql<number>`COALESCE(SUM(${schema.requestUsage.durationMs}), 0)`,
-    })
-    .from(schema.requestUsage)
-    .where(
-      and(
-        gte(schema.requestUsage.startTime, statsStartMs),
-        lte(schema.requestUsage.startTime, nowMs),
-        ...(keyFilter ? [keyFilter] : []),
-        gte(schema.requestUsage.startTime, rangeStartMs),
-        lte(schema.requestUsage.startTime, rangeEndMs)
-      )
-    );
-
-  const todayRows = await db
-    .select({
-      requests: sql<number>`COUNT(*)`,
-      inputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensInput}), 0)`,
-      outputTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensOutput}), 0)`,
-      reasoningTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensReasoning}), 0)`,
-      cachedTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCached}), 0)`,
-      cacheWriteTokens: sql<number>`COALESCE(SUM(${schema.requestUsage.tokensCacheWrite}), 0)`,
-      kwhUsed: sql<number>`COALESCE(SUM(${schema.requestUsage.kwhUsed}), 0)`,
-      totalCost: sql<number>`COALESCE(SUM(${schema.requestUsage.costTotal}), 0)`,
-    })
-    .from(schema.requestUsage)
-    .where(
-      and(
-        gte(schema.requestUsage.startTime, todayStartMs),
-        lte(schema.requestUsage.startTime, nowMs),
-        ...(keyFilter ? [keyFilter] : [])
-      )
-    );
-
-  const statsRow = statsRows[0] || {
-    requests: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    cachedTokens: 0,
-    cacheWriteTokens: 0,
-    kwhUsed: 0,
-    avgDurationMs: 0,
-    totalDurationMs: 0,
-  };
-
-  const todayRow = todayRows[0] || {
-    requests: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    reasoningTokens: 0,
-    cachedTokens: 0,
-    cacheWriteTokens: 0,
-    kwhUsed: 0,
-    totalCost: 0,
-  };
-
-  return {
-    range,
-    series: seriesRows.map((row: any) => ({
-      bucketStartMs: toNumber(row.bucketStartMs),
-      requests: toNumber(row.requests),
-      inputTokens: toNumber(row.inputTokens),
-      outputTokens: toNumber(row.outputTokens),
-      cachedTokens: toNumber(row.cachedTokens),
-      cacheWriteTokens: toNumber(row.cacheWriteTokens),
-      kwhUsed: toNumber(row.kwhUsed),
-      tokens:
-        toNumber(row.inputTokens) +
-        toNumber(row.outputTokens) +
-        toNumber(row.cachedTokens) +
-        toNumber(row.cacheWriteTokens),
-    })),
-    stats: {
-      totalRequests: toNumber(statsRow.requests),
-      totalTokens:
-        toNumber(statsRow.inputTokens) +
-        toNumber(statsRow.outputTokens) +
-        toNumber(statsRow.cachedTokens) +
-        toNumber(statsRow.cacheWriteTokens),
-      totalKwhUsed: toNumber(statsRow.kwhUsed),
-      avgDurationMs: toNumber(statsRow.avgDurationMs),
-      totalDurationMs: toNumber(statsRow.totalDurationMs),
-    },
-    today: {
-      requests: toNumber(todayRow.requests),
-      inputTokens: toNumber(todayRow.inputTokens),
-      outputTokens: toNumber(todayRow.outputTokens),
-      reasoningTokens: toNumber(todayRow.reasoningTokens),
-      cachedTokens: toNumber(todayRow.cachedTokens),
-      cacheWriteTokens: toNumber(todayRow.cacheWriteTokens),
-      kwhUsed: toNumber(todayRow.kwhUsed),
-      totalCost: toNumber(todayRow.totalCost),
-    },
-  };
-}
-
-function parsePositiveInt(value: unknown, defaultValue: number): number {
-  const parsed = parseOptionalInt(value);
-  return parsed === undefined || Number.isNaN(parsed) ? defaultValue : parsed;
-}
-
-function parseOptionalInt(value: unknown): number | undefined {
-  if (value === undefined || value === null || value === '') return undefined;
-  const parsed = typeof value === 'number' ? value : parseInt(String(value), 10);
-  return Number.isNaN(parsed) ? undefined : parsed;
 }
 
 function asOptionalString(value: unknown): string | undefined {

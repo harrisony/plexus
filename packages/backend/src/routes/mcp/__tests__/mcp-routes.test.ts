@@ -4,13 +4,11 @@ import Fastify, { FastifyInstance } from 'fastify';
 import { setConfigForTesting } from '../../../config';
 import { registerMcpRoutes } from '../index';
 import { McpUsageStorageService } from '../../../services/mcp-proxy/mcp-usage-storage';
-import { UsageStorageService } from '../../../services/usage-storage';
 import * as mcpProxyService from '../../../services/mcp-proxy/mcp-proxy-service';
 
 describe('MCP Routes', () => {
   let fastify: FastifyInstance;
   let mockMcpUsageStorage: McpUsageStorageService;
-  let mockUsageStorage: UsageStorageService;
   let mockProxyMcpRequest: any;
 
   beforeAll(async () => {
@@ -21,8 +19,6 @@ describe('MCP Routes', () => {
       saveRequest: vi.fn(),
       saveDebugLog: vi.fn(),
     } as unknown as McpUsageStorageService;
-
-    mockUsageStorage = {} as UsageStorageService;
 
     // Mock the proxyMcpRequest function to avoid network calls
     mockProxyMcpRequest = vi.fn(async () => ({
@@ -66,7 +62,7 @@ describe('MCP Routes', () => {
       },
     });
 
-    await registerMcpRoutes(fastify, mockMcpUsageStorage, mockUsageStorage);
+    await registerMcpRoutes(fastify, mockMcpUsageStorage);
     await fastify.ready();
   });
 

@@ -527,7 +527,7 @@ export const McpPage: React.FC = () => {
                           />
                         </td>
                         <td className="px-4 py-3 text-left border-b border-border-glass text-text-muted text-xs">
-                          Master toggle — disables all /mcp/* when off
+                          Disables /mcp/plexus only — gateway /mcp/:name routes still work
                         </td>
                         <td
                           className="px-4 py-3 text-left border-b border-border-glass text-text"
