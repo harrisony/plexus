@@ -3254,8 +3254,11 @@ export class Dispatcher {
         if (route.config.extraBody) {
           Object.assign(payload, route.config.extraBody);
         }
-
-        // Merge alias-level extraBody (overrides provider level)
+        // Merge model-level extraBody (overrides provider level)
+        if (route.modelConfig?.extraBody) {
+          Object.assign(payload, route.modelConfig.extraBody);
+        }
+        // Merge alias-level extraBody (overrides provider and model level)
         if (route.canonicalModel) {
           const aliasConfig = getConfig().models?.[route.canonicalModel];
           if (aliasConfig?.extraBody) {
@@ -3326,7 +3329,12 @@ export class Dispatcher {
           }
         }
 
-        const responseBody = await response.json();
+        const responseBody = await this.parseJsonResponseBody(
+          response,
+          request.requestId,
+          route,
+          'embeddings'
+        );
         logger.silly('Embeddings Response Payload', responseBody);
 
         if (request.requestId) {
@@ -3347,6 +3355,7 @@ export class Dispatcher {
         };
 
         await this.recordAttemptMetric(route, request.requestId, true);
+        CooldownManager.getInstance().markProviderSuccess(route.provider, route.model);
         this.appendSuccessAttempt(retryHistory, route, 'embeddings');
         this.attachAttemptMetadata(
           enrichedResponse,
