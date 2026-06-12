@@ -67,7 +67,8 @@ properties:
 
       - **text** — Text generation (LLM). Supports all text wire protocols:
         chat completions, messages, gemini, responses, ollama.
-      - **embeddings** — Vector embeddings.
+      - **embeddings** — Vector embeddings, including Gemini backends via
+        automatic request/response transformation.
       - **transcriptions** — Audio to text.
       - **speech** — Text to audio.
       - **image** — Image generation/editing.
