@@ -39,7 +39,9 @@ jobs:
             exit 0
           fi
 
-          if [ "$AUTHOR" = "dependabot[bot]" ]; then
+          # gh pr view --json author renders Dependabot's author as "app/dependabot",
+          # while the REST API and github.actor report "dependabot[bot]". Accept both.
+          if [ "$AUTHOR" = "dependabot[bot]" ] || [ "$AUTHOR" = "app/dependabot" ]; then
             echo "Enabling auto-merge for Dependabot PR #$PR_NUMBER"
             gh pr merge --auto --squash "$PR_NUMBER"
           else
