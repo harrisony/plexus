@@ -186,70 +186,6 @@ export type MatchCondition = z.infer<typeof MatchConditionSchema>;
 export type ReasoningRewriteRule = z.infer<typeof ReasoningRewriteRuleSchema>;
 export type ReasoningRewriteOptions = z.infer<typeof ReasoningRewriteOptionsSchema>;
 
-// ─── Generation Policy (inference-v2 Layer 4) ────────────────────────────────
-//
-// Declarative per-alias / per-key control over generation parameters on the
-// beta (pi-ai) inference path: reasoning effort plus the other capability-aware
-// knobs (max output tokens, verbosity, service tier).
-//
-// Resolution order for each knob (highest precedence first):
-//   request body → (reasoning only) x-plexus-reasoning header → key policy
-//   → alias policy → model default
-//
-// For reasoning, `floor`/`ceiling` clamp whatever effort survives that chain,
-// and `allowClientOverride: false` lets the operator pin an effort the client
-// cannot change. `maxTokens.ceiling` is a hard cap; `*.default` fills in only
-// when the client omitted the value.
-
-const ReasoningEffortEnum = z.enum(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
-const VerbosityEnum = z.enum(['low', 'medium', 'high']);
-
-export const ReasoningEffortPolicySchema = z.object({
-  /** Effort to apply when the client (and higher-precedence layers) say nothing. */
-  default: ReasoningEffortEnum.optional(),
-  /** Lowest effort allowed; requests below this are raised to it. */
-  floor: ReasoningEffortEnum.optional(),
-  /** Highest effort allowed; requests above this are lowered to it. */
-  ceiling: ReasoningEffortEnum.optional(),
-  /**
-   * When false, the client's request is ignored and `default` (or the clamp
-   * window) wins. Defaults to true: client request is honoured, then clamped.
-   */
-  allowClientOverride: z.boolean().optional(),
-});
-
-export const GenerationPolicySchema = z.object({
-  /** Reasoning/thinking effort policy. */
-  reasoning: ReasoningEffortPolicySchema.optional(),
-  /** Max output token policy (clamped to the model's real ceiling at egress). */
-  maxTokens: z
-    .object({
-      /** Applied when the client omits max tokens. */
-      default: z.number().int().positive().optional(),
-      /** Hard cap; client requests above this are lowered. */
-      ceiling: z.number().int().positive().optional(),
-    })
-    .optional(),
-  /** Output verbosity policy (OpenAI-family only at egress). */
-  verbosity: z
-    .object({
-      default: VerbosityEnum.optional(),
-      /** When false, the client's requested verbosity is ignored. */
-      allowClientOverride: z.boolean().optional(),
-    })
-    .optional(),
-  /** Service tier policy (OpenAI-family only at egress). */
-  serviceTier: z
-    .object({
-      default: z.string().min(1).optional(),
-      allowClientOverride: z.boolean().optional(),
-    })
-    .optional(),
-});
-
-export type ReasoningEffortPolicy = z.infer<typeof ReasoningEffortPolicySchema>;
-export type GenerationPolicy = z.infer<typeof GenerationPolicySchema>;
-
 // ─── pi-ai custom provider / model definitions (inference-v2) ─────────────────
 //
 // The beta (pi-ai) inference path resolves a pi-ai `Model` object for each
@@ -953,8 +889,6 @@ export const ModelConfigSchema = z
     // Extra body fields merged into every request dispatched through this alias.
     // Merged after provider-level and model-level extraBody, so alias values win.
     extraBody: z.record(z.string(), z.any()).optional(),
-    // Per-alias generation policy (reasoning, max tokens, verbosity, service tier).
-    generation: GenerationPolicySchema.optional(),
     // Model architecture override for inference energy calculation
     model_architecture: z
       .object({
@@ -1003,9 +937,6 @@ export const KeyConfigSchema = z.object({
   excludedModels: z.array(z.string().min(1)).optional(),
   excludedProviders: z.array(z.string().min(1)).optional(),
   beta: z.boolean().optional(),
-  // Per-key generation policy (reasoning, max tokens, verbosity, service tier).
-  // Takes precedence over the alias policy but is overridden by the request.
-  generation: GenerationPolicySchema.optional(),
   allowedIps: z
     .array(
       z.string().min(1).refine(isValidIpRule, {

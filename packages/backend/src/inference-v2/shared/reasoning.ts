@@ -194,3 +194,26 @@ export function intentToEffort(intent: ReasoningIntent): ReasoningEffort | 'off'
   if (intent.enabled === true) return 'medium'; // enabled but unspecified magnitude
   return undefined;
 }
+
+/**
+ * Split a trailing `:effort` suffix off a model alias.
+ *
+ * Returns the bare alias plus an intent when a recognised suffix is present
+ * (`:off|minimal|low|medium|high|xhigh|max`). Unknown suffixes are left intact
+ * on the alias (they may be a legitimate part of the model name).
+ */
+export function splitReasoningSuffix(modelAlias: string): {
+  alias: string;
+  intent?: ReasoningIntent;
+} {
+  const idx = modelAlias.lastIndexOf(':');
+  if (idx <= 0 || idx === modelAlias.length - 1) return { alias: modelAlias };
+  const suffix = modelAlias.slice(idx + 1);
+  const effort = normalizeEffort(suffix);
+  if (effort === undefined) return { alias: modelAlias };
+  const alias = modelAlias.slice(0, idx);
+  if (effort === 'off') {
+    return { alias, intent: { enabled: false, source: 'client' } };
+  }
+  return { alias, intent: { effort, enabled: true, source: 'client' } };
+}

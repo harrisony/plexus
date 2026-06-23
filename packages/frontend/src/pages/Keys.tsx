@@ -9,7 +9,6 @@ import { Tabs } from '../components/ui/Tabs';
 import { Switch } from '../components/ui/Switch';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PageContainer } from '../components/layout/PageContainer';
-import { GenerationPolicyEditor } from '../components/models/GenerationPolicyEditor';
 import { useToast } from '../contexts/ToastContext';
 import {
   Search,
@@ -942,14 +941,6 @@ export const Keys = () => {
                 checked={!!editingKey.beta}
                 onChange={(beta) => setEditingKey({ ...editingKey, beta })}
                 aria-label="Toggle beta inference path"
-              />
-            </div>
-
-            <div className="rounded-md border border-border-glass bg-bg-subtle p-3">
-              <GenerationPolicyEditor
-                scope="key"
-                value={editingKey.generation}
-                onChange={(generation) => setEditingKey({ ...editingKey, generation })}
               />
             </div>
 

@@ -50,7 +50,7 @@ import {
   computeKwhUsed,
 } from './pi-ai-utils';
 import type { GenerationIntent } from './generation';
-import { resolveGenerationIntent, splitReasoningSuffix } from './generation-policy';
+import { splitReasoningSuffix } from './reasoning';
 import { consumeTtfb } from './fetch-tap';
 import { extractPiAiErrorMessage } from '../../transformers/oauth/type-mappers';
 
@@ -521,15 +521,17 @@ export async function runPiAiExecutor<TResponse>(
     attemptedProviders.push(`${route.provider}/${route.model}`);
 
     // ── Assemble ProviderStreamOptions ────────────────────────────────────
-    // Layer 4: resolve the effective generation intent (reasoning + maxTokens/
-    // verbosity/serviceTier) through key/alias policy, header override, and the
-    // model-name reasoning suffix; then re-expand against model capabilities.
-    const effectiveGeneration = resolveGenerationIntent({
-      requestIntent: generationIntent,
-      suffixReasoning: suffixIntent,
-      request,
-      route,
-    });
+    const bodyHasSignal =
+      generationIntent.reasoning.effort != null ||
+      generationIntent.reasoning.budgetTokens != null ||
+      generationIntent.reasoning.enabled != null;
+    const chosenReasoning = bodyHasSignal
+      ? generationIntent.reasoning
+      : (suffixIntent ?? generationIntent.reasoning);
+    const effectiveGeneration: GenerationIntent = {
+      ...generationIntent,
+      reasoning: chosenReasoning,
+    };
     const generationOpts = buildGenerationOptions(piModel as any, effectiveGeneration);
     const callOptions: ProviderStreamOptions = {
       ...generationOpts,

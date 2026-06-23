@@ -537,6 +537,16 @@ function resolveCustomModel(
   return { ...merged, id: modelId, provider };
 }
 
+const API_TO_BUILTIN_PROVIDER: Record<string, string> = {
+  'anthropic-messages': 'anthropic',
+  'google-generative-ai': 'google',
+  'google-generative-ai-vertex': 'google',
+  'azure-openai-responses': 'azure',
+  'openai-completions': 'openai',
+  'openai-responses': 'openai',
+  'openai-codex-responses': 'openai',
+};
+
 /**
  * Resolve a pi-ai Model for a (provider, modelId) pair, consulting the custom
  * registries before the built-in pi-ai registry. Returns null when unresolved.
@@ -575,8 +585,9 @@ export function resolvePiAiModel(piAiProvider: string, piAiModelId: string): PiA
     // provider only supplies api/compat, not the model's token/cost metadata).
     // We try the registry under any known provider that owns this model id by
     // using the spec.api as the wire; if not found, build a skeleton.
+    const builtinProvider = API_TO_BUILTIN_PROVIDER[providerSpec.api] ?? 'openai';
     const base =
-      safeGetModel(piAiProvider, piAiModelId) ??
+      safeGetModel(builtinProvider, piAiModelId) ??
       emptyModelSkeleton(piAiModelId, piAiProvider, providerSpec.api);
     return applyCustomProvider({ ...base, id: piAiModelId, provider: piAiProvider }, providerSpec);
   }

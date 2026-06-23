@@ -821,7 +821,7 @@ export class ConfigRepository {
       preferredApi: config.preferred_api ? toJson(config.preferred_api) : null,
       piModel: config.pi_model ? toJson(config.pi_model) : null,
       extraBody: config.extraBody ? toJson(config.extraBody) : null,
-      generation: config.generation ? toJson(config.generation) : null,
+      generation: null,
       targetGroups:
         config.target_groups && config.target_groups.length > 0
           ? toJson(config.target_groups.map((g) => ({ name: g.name, selector: g.selector })))
@@ -964,9 +964,6 @@ export class ConfigRepository {
       ...(row.preferredApi ? { preferred_api: parseJson(row.preferredApi) } : {}),
       ...(row.piModel ? { pi_model: parseJson(row.piModel) } : {}),
       ...(row.extraBody ? { extraBody: parseJson(row.extraBody) } : {}),
-      ...(row.generation
-        ? { generation: parseJson<ModelConfig['generation']>(row.generation) ?? undefined }
-        : {}),
     };
 
     if (row.metadataSource) {
@@ -1014,10 +1011,6 @@ export class ConfigRepository {
         ...(excludedProviders ? { excludedProviders } : {}),
         ...(allowedIps ? { allowedIps } : {}),
         ...(row.beta ? { beta: true } : {}),
-
-        ...(row.generation
-          ? { generation: parseJson<KeyConfig['generation']>(row.generation) ?? undefined }
-          : {}),
       };
     }
 
@@ -1072,10 +1065,6 @@ export class ConfigRepository {
         ...(excludedProviders ? { excludedProviders } : {}),
         ...(allowedIps ? { allowedIps } : {}),
         ...(row.beta ? { beta: true } : {}),
-
-        ...(row.generation
-          ? { generation: parseJson<KeyConfig['generation']>(row.generation) ?? undefined }
-          : {}),
       },
     };
   }
@@ -1106,7 +1095,7 @@ export class ConfigRepository {
           excludedProviders: stringifyStringArray(config.excludedProviders),
           allowedIps: stringifyStringArray(config.allowedIps),
           beta: config.beta ?? false,
-          generation: config.generation ? toJson(config.generation) : null,
+          generation: null,
           updatedAt: timestamp,
         })
         .where(eq(schema.apiKeys.name, name));
@@ -1125,7 +1114,7 @@ export class ConfigRepository {
           excludedProviders: stringifyStringArray(config.excludedProviders),
           allowedIps: stringifyStringArray(config.allowedIps),
           beta: config.beta ?? false,
-          generation: config.generation ? toJson(config.generation) : null,
+          generation: null,
           createdAt: timestamp,
           updatedAt: timestamp,
         });

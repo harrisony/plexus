@@ -432,28 +432,6 @@ export interface AliasTargetGroup {
 
 export type PreferredApiValue = 'chat_completions' | 'messages' | 'gemini' | 'responses';
 
-export type ReasoningEffortLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
-export type VerbosityLevel = 'low' | 'medium' | 'high';
-
-/** Reasoning/thinking effort sub-policy. */
-export interface ReasoningEffortPolicy {
-  default?: ReasoningEffortLevel;
-  floor?: ReasoningEffortLevel;
-  ceiling?: ReasoningEffortLevel;
-  allowClientOverride?: boolean;
-}
-
-/**
- * Per-alias / per-key generation policy (inference-v2 Layer 4): reasoning
- * effort plus capability-aware knobs (max tokens, verbosity, service tier).
- */
-export interface GenerationPolicy {
-  reasoning?: ReasoningEffortPolicy;
-  maxTokens?: { default?: number; ceiling?: number };
-  verbosity?: { default?: VerbosityLevel; allowClientOverride?: boolean };
-  serviceTier?: { default?: string; allowClientOverride?: boolean };
-}
-
 export type PiAiApi =
   | 'openai-completions'
   | 'openai-responses'
@@ -511,7 +489,6 @@ export interface Alias {
   preferred_api?: Array<PreferredApiValue>;
   pi_model?: { provider: string; model_id: string };
   extraBody?: Record<string, any>;
-  generation?: GenerationPolicy;
 }
 
 export interface InferenceError {
@@ -996,7 +973,6 @@ export interface KeyConfig {
   excludedProviders?: string[];
   allowedIps?: string[];
   beta?: boolean;
-  generation?: GenerationPolicy;
 }
 
 export type UsageSortField =
@@ -1677,7 +1653,6 @@ export const api = {
           excludedProviders?: string[];
           allowedIps?: string[];
           beta?: boolean;
-          generation?: GenerationPolicy;
         }
       >;
 
@@ -1692,7 +1667,6 @@ export const api = {
         excludedProviders: val.excludedProviders,
         allowedIps: val.allowedIps,
         beta: val.beta,
-        ...(val.generation ? { generation: val.generation } : {}),
       }));
     } catch (e) {
       console.error('API Error getKeys', e);
@@ -1716,10 +1690,6 @@ export const api = {
           excludedProviders: keyConfig.excludedProviders ?? [],
           allowedIps: keyConfig.allowedIps ?? [],
           beta: !!keyConfig.beta,
-          ...(keyConfig.generation &&
-            Object.keys(keyConfig.generation).length > 0 && {
-              generation: keyConfig.generation,
-            }),
         }),
       }
     );
@@ -1980,8 +1950,6 @@ export const api = {
       ...(alias.model_architecture && { model_architecture: alias.model_architecture }),
       ...(alias.extraBody &&
         Object.keys(alias.extraBody).length > 0 && { extraBody: alias.extraBody }),
-      ...(alias.generation &&
-        Object.keys(alias.generation).length > 0 && { generation: alias.generation }),
       target_groups: alias.target_groups.map((g) => ({
         name: g.name,
         selector: g.selector,
@@ -2107,9 +2075,6 @@ export const api = {
             val.extraBody && typeof val.extraBody === 'object' && !Array.isArray(val.extraBody)
               ? val.extraBody
               : {},
-          ...(val.generation && typeof val.generation === 'object'
-            ? { generation: val.generation }
-            : {}),
         });
       });
       return aliases;

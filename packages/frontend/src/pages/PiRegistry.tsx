@@ -401,7 +401,8 @@ function compatValueForSave(
   for (const [k, v] of Object.entries(raw)) {
     if (v === undefined || v === '') continue;
     const f = fieldMap.get(k);
-    if (f?.control === 'json' && typeof v === 'string') {
+    if (!f) continue;
+    if (f.control === 'json' && typeof v === 'string') {
       const t = v.trim();
       if (!t) continue;
       const parsed = JSON.parse(t);
