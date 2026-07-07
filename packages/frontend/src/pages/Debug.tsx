@@ -248,13 +248,13 @@ export const Debug: React.FC = () => {
   };
 
   const clearCaptureTargets = async () => {
-    setSelectedProviders([]);
-    setSelectedKeys([]);
-    setSelectedAliases([]);
     try {
-      await api.setDebugMode(debugEnabled, null, null, null);
+      const next = await api.setDebugMode(debugEnabled, null, null, null);
+      setSelectedProviders(next.providers || []);
+      setSelectedKeys(next.keys || next.enabledKeys || []);
+      setSelectedAliases(next.aliases || []);
     } catch (e) {
-      console.error('Failed to clear capture targets', e);
+      console.error('Failed to apply capture targets', e);
     }
   };
 

@@ -47,21 +47,44 @@ describe('DebugManager target capture', () => {
   test('persists when routing resolves an alternate alias to an enabled canonical alias', () => {
     debugManager.enableForAlias('canonical-alias');
 
-    debugManager.startLog('req-canonical-alias', { model: 'alternate-alias' });
-    debugManager.setModelAliasForRequest('req-canonical-alias', 'canonical-alias');
+    const rawRequest = { model: 'alternate-alias', messages: [{ role: 'user', content: 'hello' }] };
+    const requestHeaders = { 'x-test': 'yes' };
+
+    debugManager.startLog('req-canonical-alias', rawRequest, requestHeaders);
+    expect(debugManager.getPendingLog('req-canonical-alias')).toMatchObject({
+      requestId: 'req-canonical-alias',
+      modelAlias: 'alternate-alias',
+      deferPayloadCapture: true,
+    });
+    expect(debugManager.getPendingLog('req-canonical-alias')?.rawRequest).toBeUndefined();
+
+    debugManager.setModelAliasForRequest(
+      'req-canonical-alias',
+      'canonical-alias',
+      rawRequest,
+      requestHeaders
+    );
     debugManager.flush('req-canonical-alias');
 
     expect(saveDebugLog).toHaveBeenCalledTimes(1);
     expect(saveDebugLog.mock.calls[0]?.[0]).toMatchObject({
       requestId: 'req-canonical-alias',
       modelAlias: 'canonical-alias',
+      rawRequest,
+      requestHeaders,
     });
   });
 
   test('persists when the selected provider is enabled', () => {
     debugManager.setEnabledProviders(['tracked-provider']);
 
-    debugManager.startLog('req-provider', { model: 'untracked-alias' });
+    const rawRequest = { model: 'untracked-alias', messages: [{ role: 'user', content: 'hello' }] };
+
+    debugManager.startLog('req-provider', rawRequest);
+    expect(debugManager.getPendingLog('req-provider')).toMatchObject({
+      requestId: 'req-provider',
+      rawRequest,
+    });
     debugManager.setProviderForRequest('req-provider', 'tracked-provider');
     debugManager.flush('req-provider');
 
@@ -98,6 +121,34 @@ describe('DebugManager target capture', () => {
       debugManager.flush('req-drop');
     });
 
+    expect(saveDebugLog).not.toHaveBeenCalled();
+  });
+
+  test('does not buffer full payloads when only unmatched aliases are enabled', () => {
+    debugManager.setEnabledAliases(['tracked-alias']);
+
+    const rawRequest = { model: 'other-alias', messages: [{ role: 'user', content: 'hello' }] };
+    debugManager.startLog('req-unmatched-alias', rawRequest, { 'x-test': 'yes' });
+    debugManager.addTransformedRequest('req-unmatched-alias', {
+      model: 'provider-model',
+      messages: [{ role: 'user', content: 'hello' }],
+    });
+    debugManager.addResponseMeta('req-unmatched-alias', 200, {
+      'content-type': 'application/json',
+    });
+
+    const pendingLog = debugManager.getPendingLog('req-unmatched-alias');
+    expect(pendingLog).toMatchObject({
+      requestId: 'req-unmatched-alias',
+      modelAlias: 'other-alias',
+      deferPayloadCapture: true,
+    });
+    expect(pendingLog?.rawRequest).toBeUndefined();
+    expect(pendingLog?.requestHeaders).toBeUndefined();
+    expect(pendingLog?.transformedRequest).toBeUndefined();
+    expect(pendingLog?.responseHeaders).toBeUndefined();
+
+    debugManager.flush('req-unmatched-alias');
     expect(saveDebugLog).not.toHaveBeenCalled();
   });
 });

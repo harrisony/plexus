@@ -18,6 +18,7 @@ import type { GpuParams } from '@plexus/shared';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { recordQuotaUsage, buildQuotaHeaders } from '../services/quota/quota-middleware';
 import { CooldownManager } from './cooldown-manager';
+import { sanitizeHeaders } from '../utils/sanitize-headers';
 /**
  * handleResponse
  *
@@ -63,7 +64,9 @@ export async function handleResponse(
   }
   DebugManager.getInstance().setModelAliasForRequest(
     usageRecord.requestId!,
-    usageRecord.canonicalModelName || usageRecord.incomingModelAlias || null
+    usageRecord.canonicalModelName || usageRecord.incomingModelAlias || null,
+    originalRequest,
+    sanitizeHeaders((request.headers ?? {}) as any)
   );
   usageRecord.attemptCount = unifiedResponse.plexus?.attemptCount || 1;
   usageRecord.retryHistory = unifiedResponse.plexus?.retryHistory || null;

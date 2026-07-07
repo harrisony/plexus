@@ -19,6 +19,7 @@ export interface DebugLogRecord {
   responseStatus?: number;
   provider?: string;
   createdAt?: number;
+  deferPayloadCapture?: boolean;
   /**
    * When true, this log is persisted on flush even if debug capture is not
    * otherwise enabled for its key. Set by the "capture trace on error" mode
@@ -191,10 +192,20 @@ export class DebugManager {
     }
   }
 
-  setModelAliasForRequest(requestId: string, modelAlias: string | null | undefined) {
+  setModelAliasForRequest(
+    requestId: string,
+    modelAlias: string | null | undefined,
+    rawRequest?: any,
+    requestHeaders?: Record<string, string | string[]>
+  ) {
     const log = this.pendingLogs.get(requestId);
     if (log && modelAlias) {
       log.modelAlias = modelAlias;
+      if (log.deferPayloadCapture && this.isAliasDimensionEnabled(modelAlias)) {
+        log.deferPayloadCapture = false;
+        log.rawRequest = rawRequest;
+        log.requestHeaders = requestHeaders;
+      }
     }
   }
 
@@ -203,17 +214,21 @@ export class DebugManager {
     // Seed the request id into the async-local context so the cooldown path
     // (which lacks a requestId) can force-persist this request's trace.
     setCurrentRequestId(requestId);
-    if (!this.isCaptureEnabled()) return;
+    const modelAlias = this.getRequestModelAlias(rawRequest);
+    const shouldCapturePayload = this.shouldCapturePayloadAtStart(modelAlias);
+    const shouldDeferAliasCapture =
+      !shouldCapturePayload && this.enabledAliases.size > 0 && this.enabledProviders.size === 0;
+
+    if (!shouldCapturePayload && !shouldDeferAliasCapture) return;
+
     this.pendingLogs.set(requestId, {
       requestId,
       apiKey: getCurrentKeyName() ?? null,
-      modelAlias:
-        rawRequest && typeof rawRequest === 'object' && typeof rawRequest.model === 'string'
-          ? rawRequest.model
-          : null,
-      rawRequest,
-      requestHeaders,
+      modelAlias,
+      rawRequest: shouldCapturePayload ? rawRequest : undefined,
+      requestHeaders: shouldCapturePayload ? requestHeaders : undefined,
       createdAt: Date.now(),
+      deferPayloadCapture: shouldDeferAliasCapture,
     });
 
     // Auto-cleanup after 5 minutes to prevent memory leaks if streams hang or fail to flush
@@ -226,6 +241,27 @@ export class DebugManager {
       },
       5 * 60 * 1000
     );
+  }
+
+  private getRequestModelAlias(rawRequest: any): string | null {
+    return rawRequest && typeof rawRequest === 'object' && typeof rawRequest.model === 'string'
+      ? rawRequest.model
+      : null;
+  }
+
+  private shouldCapturePayloadAtStart(modelAlias: string | null): boolean {
+    return (
+      this.captureOnError ||
+      this.enabledGlobal ||
+      this.isKeyDimensionEnabled(getCurrentKeyName() ?? null) ||
+      this.enabledProviders.size > 0 ||
+      this.isAliasDimensionEnabled(modelAlias)
+    );
+  }
+
+  private shouldCapturePayloadForRequest(requestId: string): boolean {
+    const log = this.pendingLogs.get(requestId);
+    return !log?.deferPayloadCapture;
   }
 
   private ensureLog(requestId: string): DebugLogRecord {
@@ -243,12 +279,14 @@ export class DebugManager {
 
   addTransformedRequest(requestId: string, payload: any) {
     if (!this.isCaptureEnabled()) return;
+    if (!this.shouldCapturePayloadForRequest(requestId)) return;
     const log = this.ensureLog(requestId);
     log.transformedRequest = payload;
   }
 
   addRawResponse(requestId: string, payload: any) {
     if (!this.isCaptureEnabled()) return;
+    if (!this.shouldCapturePayloadForRequest(requestId)) return;
     const log = this.ensureLog(requestId);
     log.rawResponse = payload;
   }
@@ -263,6 +301,7 @@ export class DebugManager {
   addTransformedResponse(requestId: string, payload: any) {
     // Only save full response bodies if debug mode is enabled (for DB persistence)
     if (!this.isCaptureEnabled()) return;
+    if (!this.shouldCapturePayloadForRequest(requestId)) return;
     const log = this.ensureLog(requestId);
     log.transformedResponse = payload;
   }
@@ -275,6 +314,7 @@ export class DebugManager {
 
   addResponseMeta(requestId: string, status: number, headers: Record<string, string>) {
     if (!this.isCaptureEnabled()) return;
+    if (!this.shouldCapturePayloadForRequest(requestId)) return;
     const log = this.ensureLog(requestId);
     log.responseStatus = status;
     log.responseHeaders = headers;
