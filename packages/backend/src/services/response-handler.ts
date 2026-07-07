@@ -19,6 +19,7 @@ import type { GpuParams } from '@plexus/shared';
 import { QuotaEnforcer } from '../services/quota/quota-enforcer';
 import { recordQuotaUsage, buildQuotaHeaders } from '../services/quota/quota-middleware';
 import { CooldownManager } from './cooldown-manager';
+import { sanitizeHeaders } from '../utils/sanitize-headers';
 
 function getHeaderValue(request: FastifyRequest, headerName: string): string | undefined {
   const value = request.headers?.[headerName];
@@ -80,6 +81,12 @@ export async function handleResponse(
   if (usageRecord.provider) {
     DebugManager.getInstance().setProviderForRequest(usageRecord.requestId!, usageRecord.provider);
   }
+  DebugManager.getInstance().setModelAliasForRequest(
+    usageRecord.requestId!,
+    usageRecord.canonicalModelName || usageRecord.incomingModelAlias || null,
+    originalRequest,
+    sanitizeHeaders((request.headers ?? {}) as any)
+  );
   usageRecord.attemptCount = unifiedResponse.plexus?.attemptCount || 1;
   usageRecord.retryHistory = unifiedResponse.plexus?.retryHistory || null;
   usageRecord.finalAttemptProvider =
