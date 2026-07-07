@@ -6,6 +6,10 @@ post:
     OpenAI Responses API compatible. Plexus supports multi-turn continuation
     via `previous_response_id` or `conversation` — it loads the prior output
     items server-side so the client only needs to send the new input.
+
+    Recognized client headers: `x-app`, `x-plexus-session-id`, `session_id`,
+    and `x-client-request-id`. The last two are forwarded upstream only when the
+    resolved alias has `upstream_cache_affinity: true`.
   requestBody:
     required: true
     content:

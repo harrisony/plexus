@@ -33,8 +33,9 @@ post:
     with `data: {...}` frames containing chat completions deltas, terminated by
     `data: [DONE]`.
 
-    Forwarded client headers: `x-app` (echoed into usage `plexus_metadata.clientHeaders`),
-    `session_id`, `x-client-request-id` (for prompt cache routing on `/v1/responses`).
+    Recognized client headers: `x-app` (echoed into usage `plexus_metadata.clientHeaders`)
+    and `x-plexus-session-id` (used only for Plexus-internal sticky routing; never
+    forwarded upstream).
   requestBody:
     required: true
     content:

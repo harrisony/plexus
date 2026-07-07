@@ -456,6 +456,7 @@ export interface Alias {
   };
   enforce_limits?: boolean;
   sticky_session?: boolean;
+  upstream_cache_affinity?: boolean;
   preferred_api?: Array<PreferredApiValue>;
   pi_model?: { provider: string; model_id: string };
   extraBody?: Record<string, any>;
@@ -1992,6 +1993,7 @@ export const api = {
       use_image_fallthrough: alias.use_image_fallthrough || false,
       enforce_limits: alias.enforce_limits || false,
       sticky_session: alias.sticky_session ?? true,
+      upstream_cache_affinity: alias.upstream_cache_affinity || false,
       ...(alias.preferred_api &&
         alias.preferred_api.length > 0 && {
           preferred_api: alias.preferred_api,
@@ -2120,6 +2122,7 @@ export const api = {
           use_image_fallthrough: val.use_image_fallthrough || false,
           enforce_limits: val.enforce_limits || false,
           sticky_session: val.sticky_session ?? true,
+          upstream_cache_affinity: val.upstream_cache_affinity || false,
           advanced: val.advanced || [],
           metadata: val.metadata,
           model_architecture: val.model_architecture,

@@ -19,6 +19,7 @@ import { attachKeyAccessPolicy } from '../../utils/auth';
 import { wireUpstreamTimeout, wireEarlyDisconnectDetection } from '../../utils/timeout';
 import { wireStallDetection, getGlobalStallConfig } from '../../utils/stall';
 import { sanitizeHeaders } from '../../utils/sanitize-headers';
+import { PLEXUS_SESSION_ID_HEADER } from './constants';
 
 export async function registerResponsesRoute(
   fastify: FastifyInstance,
@@ -157,6 +158,12 @@ export async function registerResponsesRoute(
       unifiedRequest.incomingApiType = 'responses';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      const stickySessionHeader = Array.isArray(request.headers[PLEXUS_SESSION_ID_HEADER])
+        ? request.headers[PLEXUS_SESSION_ID_HEADER][0]
+        : request.headers[PLEXUS_SESSION_ID_HEADER];
+      if (typeof stickySessionHeader === 'string' && stickySessionHeader.trim()) {
+        unifiedRequest.stickySessionId = stickySessionHeader;
+      }
       if (body.previous_response_id) {
         unifiedRequest.previousResponseId = body.previous_response_id;
       }

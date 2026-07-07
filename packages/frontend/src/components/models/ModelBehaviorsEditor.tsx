@@ -133,6 +133,25 @@ export function ModelBehaviorsEditor({ editingAlias, setEditingAlias }: Props) {
                 size="sm"
               />
             </div>
+
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <span className="font-body text-[13px] text-text">Upstream Cache Affinity</span>
+                <p className="font-body text-[11px] text-text-muted mt-0.5">
+                  On the <code className="text-primary">/v1/responses</code> path only, forward
+                  client-supplied <code className="text-primary">session_id</code> and{' '}
+                  <code className="text-primary">x-client-request-id</code> upstream so providers
+                  can keep prompt-cache locality. This is independent from Plexus sticky routing.
+                </p>
+              </div>
+              <Switch
+                checked={editingAlias.upstream_cache_affinity || false}
+                onChange={(val) =>
+                  setEditingAlias({ ...editingAlias, upstream_cache_affinity: val })
+                }
+                size="sm"
+              />
+            </div>
           </div>
 
           <div className="h-px bg-border-glass"></div>

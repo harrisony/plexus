@@ -285,4 +285,30 @@ describe('migrateLegacyTargetGroups', () => {
     // Unset on input defaults to false in the DB column.
     expect((await repo.getAlias('sticky-unset'))!.sticky_session).toBe(false);
   });
+
+  it('round-trips upstream_cache_affinity through saveAlias and getAlias', async () => {
+    await repo.saveAlias('affinity-on', {
+      target_groups: [
+        { name: 'default', selector: 'random', targets: [{ provider: 'p1', model: 'm1' }] },
+      ],
+      upstream_cache_affinity: true,
+    } as any);
+
+    await repo.saveAlias('affinity-off', {
+      target_groups: [
+        { name: 'default', selector: 'random', targets: [{ provider: 'p2', model: 'm2' }] },
+      ],
+      upstream_cache_affinity: false,
+    } as any);
+
+    await repo.saveAlias('affinity-unset', {
+      target_groups: [
+        { name: 'default', selector: 'random', targets: [{ provider: 'p3', model: 'm3' }] },
+      ],
+    } as any);
+
+    expect((await repo.getAlias('affinity-on'))!.upstream_cache_affinity).toBe(true);
+    expect((await repo.getAlias('affinity-off'))!.upstream_cache_affinity).toBe(false);
+    expect((await repo.getAlias('affinity-unset'))!.upstream_cache_affinity).toBe(false);
+  });
 });
