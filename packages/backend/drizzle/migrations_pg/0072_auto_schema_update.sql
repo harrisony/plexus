@@ -1,0 +1,1 @@
+ALTER TABLE "model_aliases" ADD COLUMN "upstream_cache_affinity" boolean DEFAULT false NOT NULL;

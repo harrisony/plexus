@@ -505,6 +505,13 @@
       "when": 1783309798892,
       "tag": "0071_add_auto_compat",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1783392668447,
+      "tag": "0072_auto_schema_update",
+      "breakpoints": true
     }
   ]
 }
