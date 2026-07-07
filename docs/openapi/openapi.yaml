@@ -108,6 +108,8 @@ info:
     - `x-app` — application identifier. Echoed into
       `plexus_metadata.clientHeaders` on the usage record (all inference
       routes).
+    - `x-plexus-session-id` — Plexus-only sticky routing identifier.
+      Consumed internally and never forwarded upstream.
     - `session_id` — client session identifier. Forwarded as an HTTP
       header for prompt cache routing (`/v1/responses` only).
     - `x-client-request-id` — client-supplied request correlation ID.

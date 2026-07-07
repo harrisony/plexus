@@ -34,12 +34,17 @@ export class StickySessionManager {
    * Derive a session key for the request, or null when stickiness does not
    * apply (single-turn requests).
    *
+   * - Prefer `stickySessionId` when the client supplied Plexus's dedicated
+   *   sticky-routing header.
    * - Responses API: prefer `previousResponseId` (already a stable chain id).
    * - Otherwise: hash the first two messages (system + first user, typically),
    *   which is constant-size work regardless of conversation length and is
    *   stable across turns of the same conversation.
    */
   public static computeSessionKey(req: UnifiedChatRequest): string | null {
+    if (req.stickySessionId) {
+      return `s:${req.stickySessionId}`;
+    }
     if (req.previousResponseId) {
       return `r:${req.previousResponseId}`;
     }

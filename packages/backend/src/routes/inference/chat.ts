@@ -67,6 +67,12 @@ export async function registerChatRoute(
       unifiedRequest.incomingApiType = 'chat';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      const stickySessionHeader = Array.isArray(request.headers['x-plexus-session-id'])
+        ? request.headers['x-plexus-session-id'][0]
+        : request.headers['x-plexus-session-id'];
+      if (typeof stickySessionHeader === 'string' && stickySessionHeader.trim()) {
+        unifiedRequest.stickySessionId = stickySessionHeader;
+      }
       unifiedRequest = attachKeyAccessPolicy(request, unifiedRequest);
       const xAppHeader = Array.isArray(request.headers['x-app'])
         ? request.headers['x-app'][0]

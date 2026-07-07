@@ -157,6 +157,12 @@ export async function registerResponsesRoute(
       unifiedRequest.incomingApiType = 'responses';
       unifiedRequest.originalBody = body;
       unifiedRequest.requestId = requestId;
+      const stickySessionHeader = Array.isArray(request.headers['x-plexus-session-id'])
+        ? request.headers['x-plexus-session-id'][0]
+        : request.headers['x-plexus-session-id'];
+      if (typeof stickySessionHeader === 'string' && stickySessionHeader.trim()) {
+        unifiedRequest.stickySessionId = stickySessionHeader;
+      }
       if (body.previous_response_id) {
         unifiedRequest.previousResponseId = body.previous_response_id;
       }

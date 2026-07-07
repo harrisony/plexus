@@ -49,3 +49,25 @@ describe('ModelConfigSchema sticky_session parsing', () => {
     expect(() => validateConfig(configWithAlias({ sticky_session: 1 }))).toThrow();
   });
 });
+
+describe('ModelConfigSchema upstream_cache_affinity parsing', () => {
+  it('accepts upstream_cache_affinity: true', () => {
+    const cfg = validateConfig(configWithAlias({ upstream_cache_affinity: true }));
+    expect(cfg.models?.['test-alias']?.upstream_cache_affinity).toBe(true);
+  });
+
+  it('accepts upstream_cache_affinity: false', () => {
+    const cfg = validateConfig(configWithAlias({ upstream_cache_affinity: false }));
+    expect(cfg.models?.['test-alias']?.upstream_cache_affinity).toBe(false);
+  });
+
+  it('defaults upstream_cache_affinity to true when not provided', () => {
+    const cfg = validateConfig(configWithAlias({}));
+    expect(cfg.models?.['test-alias']?.upstream_cache_affinity).toBe(true);
+  });
+
+  it('rejects non-boolean upstream_cache_affinity', () => {
+    expect(() => validateConfig(configWithAlias({ upstream_cache_affinity: 'yes' }))).toThrow();
+    expect(() => validateConfig(configWithAlias({ upstream_cache_affinity: 1 }))).toThrow();
+  });
+});

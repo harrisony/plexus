@@ -1887,11 +1887,11 @@ export class Dispatcher {
       Object.assign(headers, route.config.headers);
     }
 
-    // Forward cache routing headers for Responses API prompt caching.
-    // These headers enable server-side cache routing at the upstream provider
-    // (e.g. theclawbay, OpenAI). Without them, each request may land on a
-    // different backend server, causing cache misses.
-    if (request.cacheRoutingHeaders) {
+    // Forward cache routing headers only when the resolved alias explicitly
+    // opts into upstream cache affinity. Direct provider/model passthroughs
+    // and aliases without the flag preserve the prior no-forwarding behavior.
+    const aliasConfig = route.canonicalModel ? getConfig().models?.[route.canonicalModel] : null;
+    if (aliasConfig?.upstream_cache_affinity && request.cacheRoutingHeaders) {
       if (request.cacheRoutingHeaders.session_id) {
         headers['session_id'] = request.cacheRoutingHeaders.session_id;
       }

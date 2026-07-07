@@ -104,6 +104,12 @@ export interface PlexusMetadata {
 export interface UnifiedChatRequest {
   requestId?: string;
   /**
+   * Plexus-internal sticky session identifier sourced from the
+   * `x-plexus-session-id` header. Used only for target stickiness and
+   * never forwarded upstream.
+   */
+  stickySessionId?: string;
+  /**
    * Set by the Responses API route when the client supplied
    * `previous_response_id`. Used by sticky-session routing to chain turns
    * without hashing message content.

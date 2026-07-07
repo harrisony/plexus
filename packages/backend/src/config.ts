@@ -841,6 +841,9 @@ export const ModelConfigSchema = z
     // in the alias targets). Tracked in-memory only; see
     // services/sticky-session-manager.ts.
     sticky_session: z.boolean().default(true),
+    // When true, Plexus forwards cache-affinity headers to upstream providers
+    // on the Responses API path. This is independent from sticky_session.
+    upstream_cache_affinity: z.boolean().default(true).optional(),
     // Advertised in GET /v1/models to inform clients of the preferred API surface(s)
     // for this alias, even if plexus can translate between them.
     preferred_api: z

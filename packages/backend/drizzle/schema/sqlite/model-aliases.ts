@@ -15,6 +15,7 @@ export const modelAliases = sqliteTable('model_aliases', {
   modelArchitecture: text('model_architecture'), // JSON: override for total_params, active_params, layers, heads, kv_lora_rank, qk_rope_head_dim, context_length, dtype
   enforceLimits: integer('enforce_limits').notNull().default(0),
   stickySession: integer('sticky_session').notNull().default(0),
+  upstreamCacheAffinity: integer('upstream_cache_affinity').notNull().default(1),
   preferredApi: text('preferred_api'), // JSON: ('chat_completions' | 'messages' | 'gemini' | 'responses')[]
   piModel: text('pi_model'), // JSON: { provider: string, model_id: string }
   targetGroups: text('target_groups'), // JSON: {name, selector}[]

@@ -129,6 +129,14 @@ properties:
       When enabled, multi-turn conversations prefer the same provider/model
       from the previous turn (when still healthy) for better prompt-cache
       hit rates.
+  upstream_cache_affinity:
+    type: boolean
+    default: true
+    description: >
+      When enabled, Plexus forwards client-supplied `session_id` and
+      `x-client-request-id` headers upstream on the `/v1/responses` path so
+      providers can keep prompt-cache locality. Independent from
+      `sticky_session`.
   metadata:
     description: >
       Optional reference to an external model catalog entry. When configured,

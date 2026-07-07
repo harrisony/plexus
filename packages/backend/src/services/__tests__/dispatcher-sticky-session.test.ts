@@ -39,7 +39,7 @@ function errorResponse(status: number, message: string) {
   });
 }
 
-function configFor(opts: { sticky: boolean }) {
+function configFor(opts: { sticky: boolean; upstreamCacheAffinity?: boolean }) {
   return {
     providers: {
       p1: {
@@ -59,6 +59,7 @@ function configFor(opts: { sticky: boolean }) {
       'test-alias': {
         selector: 'in_order',
         sticky_session: opts.sticky,
+        upstream_cache_affinity: opts.upstreamCacheAffinity ?? true,
         targets: [
           { provider: 'p1', model: 'model-1' },
           { provider: 'p2', model: 'model-2' },
@@ -254,5 +255,45 @@ describe('Dispatcher sticky_session write-back', () => {
       provider: 'oauthClaude',
       model: 'claude-test',
     });
+  });
+
+  test('forwards cache-affinity headers only when upstream_cache_affinity is enabled', async () => {
+    setConfigForTesting(configFor({ sticky: true, upstreamCacheAffinity: true }));
+    let requestHeaders: Record<string, string> | undefined;
+    fetchMock.mockImplementation(async (_url: any, init?: any) => {
+      requestHeaders = init?.headers;
+      return successChatResponse('model-1');
+    });
+
+    await new Dispatcher().dispatch({
+      ...multiTurnRequest(),
+      cacheRoutingHeaders: {
+        session_id: 'session-123',
+        'x-client-request-id': 'request-456',
+      },
+    });
+
+    expect(requestHeaders?.session_id).toBe('session-123');
+    expect(requestHeaders?.['x-client-request-id']).toBe('request-456');
+  });
+
+  test('does not forward cache-affinity headers when upstream_cache_affinity is disabled', async () => {
+    setConfigForTesting(configFor({ sticky: true, upstreamCacheAffinity: false }));
+    let requestHeaders: Record<string, string> | undefined;
+    fetchMock.mockImplementation(async (_url: any, init?: any) => {
+      requestHeaders = init?.headers;
+      return successChatResponse('model-1');
+    });
+
+    await new Dispatcher().dispatch({
+      ...multiTurnRequest(),
+      cacheRoutingHeaders: {
+        session_id: 'session-123',
+        'x-client-request-id': 'request-456',
+      },
+    });
+
+    expect(requestHeaders?.session_id).toBeUndefined();
+    expect(requestHeaders?.['x-client-request-id']).toBeUndefined();
   });
 });

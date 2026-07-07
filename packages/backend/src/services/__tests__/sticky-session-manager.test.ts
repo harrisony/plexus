@@ -31,6 +31,15 @@ describe('StickySessionManager.computeSessionKey', () => {
     expect(StickySessionManager.computeSessionKey(req)).toBe('r:resp_abc123');
   });
 
+  test('returns stickySessionId-derived key when set', () => {
+    const req = {
+      model: 'x',
+      messages: [],
+      stickySessionId: 'sticky-123',
+    } as unknown as UnifiedChatRequest;
+    expect(StickySessionManager.computeSessionKey(req)).toBe('s:sticky-123');
+  });
+
   test('hash is stable across turns of the same conversation', () => {
     const turn1 = {
       model: 'x',
@@ -84,6 +93,19 @@ describe('StickySessionManager.computeSessionKey', () => {
       previousResponseId: 'resp_xyz',
     } as unknown as UnifiedChatRequest;
     expect(StickySessionManager.computeSessionKey(req)).toBe('r:resp_xyz');
+  });
+
+  test('stickySessionId takes priority over previousResponseId and message hash', () => {
+    const req = {
+      model: 'x',
+      messages: [
+        { role: 'system', content: 'sys' },
+        { role: 'user', content: 'hello' },
+      ],
+      stickySessionId: 'sticky-123',
+      previousResponseId: 'resp_xyz',
+    } as unknown as UnifiedChatRequest;
+    expect(StickySessionManager.computeSessionKey(req)).toBe('s:sticky-123');
   });
 });
 
