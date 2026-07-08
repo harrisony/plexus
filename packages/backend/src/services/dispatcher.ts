@@ -70,7 +70,7 @@ interface RetryHistoryLikeEntry {
 
 type ResolveTimeoutMs = (timeoutMs?: number | null) => number;
 
-const CLIENT_ERROR_MESSAGE_LIMIT = 1000;
+const PROVIDER_ERROR_SUMMARY_LIMIT = 500;
 
 /**
  * Request-level API types (e.g. embeddings, transcriptions) share base URLs
@@ -413,19 +413,21 @@ function stripTrailingApiVersion(url: string): string {
 export class Dispatcher {
   private usageStorage?: UsageStorageService;
 
-  private compactClientErrorMessage(value: unknown): string {
-    const text = String(value || 'Unknown provider error').trim();
+  private compactProviderErrorSummary(value: unknown): string {
+    const raw = typeof value === 'string' ? value : value == null ? '' : String(value);
+    const text = raw.trim() || 'Unknown provider error';
+    const chars = Array.from(text);
 
-    if (text.length <= CLIENT_ERROR_MESSAGE_LIMIT) {
+    if (chars.length <= PROVIDER_ERROR_SUMMARY_LIMIT) {
       return text;
     }
 
-    return `${text.slice(0, CLIENT_ERROR_MESSAGE_LIMIT)}... [truncated ${text.length - CLIENT_ERROR_MESSAGE_LIMIT} chars]`;
+    return `${chars.slice(0, PROVIDER_ERROR_SUMMARY_LIMIT).join('')}... [truncated ${chars.length - PROVIDER_ERROR_SUMMARY_LIMIT} chars]`;
   }
 
   private formatClientProviderError(statusCode: number, errorText: string): string {
     const reason = this.extractFailureReason(errorText) || errorText || 'Unknown provider error';
-    return `Provider failed: ${statusCode} ${this.compactClientErrorMessage(reason)}`;
+    return `Provider failed: ${statusCode} ${this.compactProviderErrorSummary(reason)}`;
   }
 
   private extractFailureReason(value: unknown): string | undefined {
@@ -508,10 +510,10 @@ export class Dispatcher {
     const statusCode = error?.routingContext?.statusCode ?? error?.status ?? error?.statusCode;
 
     if (includeStatusCode && typeof statusCode === 'number') {
-      return `HTTP ${statusCode}: ${extracted}`.slice(0, 500);
+      return this.compactProviderErrorSummary(`HTTP ${statusCode}: ${extracted}`);
     }
 
-    return String(extracted).slice(0, 500);
+    return this.compactProviderErrorSummary(extracted);
   }
 
   private async recordAttemptMetric(
@@ -1812,7 +1814,7 @@ export class Dispatcher {
     retryHistory: RetryAttemptRecord[] = []
   ): Error {
     const summary = attemptedProviders.length > 0 ? attemptedProviders.join(', ') : 'none';
-    const baseMessage = this.compactClientErrorMessage(
+    const baseMessage = this.compactProviderErrorSummary(
       this.formatFailureReason(lastError) || lastError?.message || 'Unknown provider error'
     );
     const enriched = new Error(`All targets failed: ${summary}. Last error: ${baseMessage}`) as any;
@@ -3316,7 +3318,10 @@ export class Dispatcher {
         route.provider,
         route.model,
         cooldownDuration,
-        `HTTP ${response.status}: ${errorText.slice(0, 500)}`
+        this.formatFailureReason(
+          { routingContext: { providerResponse: errorText, statusCode: response.status } },
+          true
+        )
       );
     }
 

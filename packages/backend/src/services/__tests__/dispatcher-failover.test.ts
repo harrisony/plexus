@@ -267,13 +267,56 @@ describe('Dispatcher Failover', () => {
       expect(error.message).toContain('All targets failed');
       expect(error.message).toContain('Invalid Responses API request');
       expect(error.message).not.toContain(largeValidationDetails);
-      expect(error.message.length).toBeLessThan(500);
+      expect(error.message.length).toBeLessThan(650);
       expect(error.routingContext?.providerResponse).toBe(providerBody);
 
       const retryHistory = JSON.parse(error.routingContext?.retryHistory || '[]');
       expect(retryHistory.length).toBeGreaterThanOrEqual(1);
       expect(
         retryHistory.every((attempt: any) => attempt.reason === 'Invalid Responses API request')
+      ).toBe(true);
+    }
+  });
+
+  test('large upstream error messages are capped consistently', async () => {
+    setConfigForTesting(makeConfig({ targetCount: 1 }));
+    const largeProviderMessage = `Invalid Responses API request ${'invalid input '.repeat(25_000)}`;
+    const providerBody = JSON.stringify({
+      error: {
+        message: largeProviderMessage,
+        code: 'invalid_prompt',
+      },
+    });
+
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(providerBody, {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+
+    const dispatcher = new Dispatcher();
+
+    try {
+      await dispatcher.dispatch(makeChatRequest());
+      throw new Error('expected dispatch to fail');
+    } catch (error: any) {
+      expect(error.message).toContain('Invalid Responses API request');
+      expect(error.message).toContain('[truncated');
+      expect(error.message).not.toContain(largeProviderMessage);
+      expect(error.message.length).toBeLessThan(650);
+      expect(error.routingContext?.providerResponse).toBe(providerBody);
+
+      const retryHistory = JSON.parse(error.routingContext?.retryHistory || '[]');
+      expect(retryHistory.length).toBeGreaterThanOrEqual(1);
+      expect(
+        retryHistory.every(
+          (attempt: any) =>
+            attempt.reason.startsWith('Invalid Responses API request') &&
+            attempt.reason.includes('[truncated') &&
+            attempt.reason.length < 550
+        )
       ).toBe(true);
     }
   });
