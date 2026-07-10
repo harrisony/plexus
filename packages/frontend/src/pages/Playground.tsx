@@ -53,10 +53,16 @@ const toolParameters = {
       },
     },
   },
-  add_task: {
+  add_tasks: {
     type: 'object',
-    properties: { title: { type: 'string', description: 'The task to add' } },
-    required: ['title'],
+    properties: {
+      titles: {
+        type: 'array',
+        description: 'One or more tasks to add together',
+        items: { type: 'string' },
+      },
+    },
+    required: ['titles'],
   },
   list_tasks: {
     type: 'object',
@@ -66,7 +72,8 @@ const toolParameters = {
 
 const toolDescriptions = {
   get_date: 'Get the current date and time in an optional timezone.',
-  add_task: 'Add a task to this browser-only test task list.',
+  add_tasks:
+    'Add one or more tasks to this browser-only test task list. Use one call with every task in titles.',
   list_tasks: 'List tasks added during this current Playground chat session.',
 };
 
@@ -94,6 +101,12 @@ const geminiTools = [
     })),
   },
 ];
+
+type PlaygroundToolCall = {
+  name: string;
+  arguments: string;
+  result: string;
+};
 
 type RetryAttempt = {
   index?: number;
@@ -258,6 +271,7 @@ type ChatSimulationProps = {
   selectedApi: PlaygroundApi;
   toolMode: ToolMode;
   onRoutingPending: (clientRequestId: string) => void;
+  onToolCalls: (calls: PlaygroundToolCall[]) => void;
 };
 
 const ChatSimulation = memo(
@@ -267,11 +281,12 @@ const ChatSimulation = memo(
     selectedApi,
     toolMode,
     onRoutingPending,
+    onToolCalls,
   }: ChatSimulationProps) => {
     const tasksRef = useRef<string[]>([]);
     const pendingOpenAiToolCallsRef = useRef(false);
-    const runBrowserTools = (calls: BrowserToolCall[]) =>
-      calls.map((call) => {
+    const runBrowserTools = (calls: BrowserToolCall[]) => {
+      const results = calls.map((call) => {
         let args: Record<string, unknown> = {};
         try {
           args = JSON.parse(call.arguments) as Record<string, unknown>;
@@ -293,12 +308,21 @@ const ChatSimulation = memo(
               return { response: JSON.stringify({ error: `Invalid timezone: ${timezone}` }) };
             }
           }
-          case 'add_task': {
-            const title = typeof args.title === 'string' ? args.title.trim() : '';
-            if (!title) return { response: JSON.stringify({ error: 'A task title is required.' }) };
-            tasksRef.current.push(title);
+          case 'add_tasks': {
+            const titles = Array.isArray(args.titles)
+              ? args.titles
+                  .filter((title): title is string => typeof title === 'string')
+                  .map((title) => title.trim())
+                  .filter(Boolean)
+              : [];
+            if (titles.length === 0) {
+              return {
+                response: JSON.stringify({ error: 'At least one task title is required.' }),
+              };
+            }
+            tasksRef.current.push(...titles);
             return {
-              response: JSON.stringify({ added: title, taskCount: tasksRef.current.length }),
+              response: JSON.stringify({ added: titles, taskCount: tasksRef.current.length }),
             };
           }
           case 'list_tasks':
@@ -307,10 +331,28 @@ const ChatSimulation = memo(
             return { response: JSON.stringify({ error: `Unknown browser tool: ${call.name}` }) };
         }
       });
+      window.setTimeout(
+        () =>
+          onToolCalls(
+            calls.map((call, index) => ({
+              name: call.name,
+              arguments: call.arguments,
+              result: results[index]?.response ?? '',
+            }))
+          ),
+        0
+      );
+      return results;
+    };
 
     const requestInterceptor = (details: { body: unknown; headers?: Record<string, string> }) => {
       const clientRequestId = crypto.randomUUID();
-      window.setTimeout(() => onRoutingPending(clientRequestId), 0);
+      const messages =
+        details.body && typeof details.body === 'object' && 'messages' in details.body
+          ? (details.body as { messages?: Array<{ role?: string }> }).messages
+          : undefined;
+      const isToolContinuation = messages?.some((message) => message.role === 'tool') ?? false;
+      if (!isToolContinuation) window.setTimeout(() => onRoutingPending(clientRequestId), 0);
       return {
         ...details,
         headers: {
@@ -555,6 +597,7 @@ export const Playground = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [routingInfo, setRoutingInfo] = useState<RoutingInfo>({ status: 'idle' });
+  const [toolCalls, setToolCalls] = useState<PlaygroundToolCall[]>([]);
   const routingRequestRef = useRef(0);
 
   const selectedKey = useMemo(
@@ -616,6 +659,7 @@ export const Playground = () => {
   const handleRoutingPending = useCallback((clientRequestId: string) => {
     const requestNumber = ++routingRequestRef.current;
     setRoutingInfo({ status: 'pending' });
+    setToolCalls([]);
 
     // Streaming responses do not have a JSON body to carry Playground metadata.
     // The inference route persists its routing decision before it starts SSE,
@@ -669,6 +713,10 @@ export const Playground = () => {
     };
 
     void pollRouting();
+  }, []);
+
+  const handleToolCalls = useCallback((calls: PlaygroundToolCall[]) => {
+    setToolCalls((current) => [...current, ...calls]);
   }, []);
 
   const retryHistory = parseRetryHistory(routingInfo.routing?.retryHistory);
@@ -895,6 +943,7 @@ export const Playground = () => {
                   selectedApi={selectedApi}
                   toolMode={toolMode}
                   onRoutingPending={handleRoutingPending}
+                  onToolCalls={handleToolCalls}
                 />
               </div>
             ) : (
@@ -977,6 +1026,34 @@ export const Playground = () => {
                   <div className="text-text">{routingInfo.routing?.apiType || '-'}</div>
                 </div>
               </div>
+
+              {toolCalls.length > 0 && (
+                <div className="rounded-md border border-border bg-bg-subtle/40 p-3">
+                  <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                    Browser tool calls
+                  </div>
+                  <ol className="space-y-2">
+                    {toolCalls.map((toolCall, index) => (
+                      <li
+                        key={`${toolCall.name}:${toolCall.arguments}:${index}`}
+                        className="rounded border border-border/70 bg-slate-950/30 p-2"
+                      >
+                        <div className="mb-1 font-medium text-text">
+                          {index + 1}. {toolCall.name}
+                        </div>
+                        <div className="font-mono text-[10px] text-text-muted">Arguments</div>
+                        <pre className="mt-0.5 max-h-24 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950/60 p-1.5 font-mono text-[10px] text-text-secondary">
+                          {toolCall.arguments}
+                        </pre>
+                        <div className="mt-2 font-mono text-[10px] text-text-muted">Result</div>
+                        <pre className="mt-0.5 max-h-24 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950/60 p-1.5 font-mono text-[10px] text-text-secondary">
+                          {toolCall.result}
+                        </pre>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
 
               {attemptedProviders.length > 0 && (
                 <div className="rounded-md border border-border bg-bg-subtle/40 p-3">
