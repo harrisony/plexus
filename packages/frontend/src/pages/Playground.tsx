@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DeepChat } from 'deep-chat-react';
+import type { DeepChat as DeepChatElement } from 'deep-chat';
 import {
   CheckCircle2,
   Clock,
@@ -87,9 +88,11 @@ const toolParameters = {
     properties: {
       timezone: {
         type: 'string',
-        description: 'Optional IANA timezone, such as America/Los_Angeles',
+        description: 'IANA timezone, such as America/Los_Angeles. Use UTC when none is specified.',
       },
     },
+    required: ['timezone'],
+    additionalProperties: false,
   },
   add_tasks: {
     type: 'object',
@@ -101,37 +104,36 @@ const toolParameters = {
       },
     },
     required: ['titles'],
+    additionalProperties: false,
   },
   list_tasks: {
     type: 'object',
     properties: {},
+    additionalProperties: false,
   },
-};
+} satisfies Record<
+  string,
+  { type: 'object'; properties: object; required?: string[]; additionalProperties: false }
+>;
 
 const toolDescriptions = {
-  get_date: 'Get the current date and time in an optional timezone.',
+  get_date:
+    'Get the current date and time in a specified timezone. Use UTC when none is specified.',
   add_tasks:
     'Add one or more tasks to this browser-only test task list. Use one call with every task in titles.',
   list_tasks: 'List tasks added during this current Playground chat session.',
 };
 
+// Deep Chat normalizes this function-tool shape for both OpenAI APIs.
 const openAiTools = Object.entries(toolParameters).map(([name, parameters]) => ({
-  type: 'function',
-  function: {
-    name,
-    description: toolDescriptions[name as keyof typeof toolDescriptions],
-    parameters,
-  },
-}));
-
-// Chat Completions expects function definitions nested under `function`, while
-// Responses defines the same fields directly on the tool object.
-const responsesTools = Object.entries(toolParameters).map(([name, parameters]) => ({
-  type: 'function',
+  type: 'function' as const,
   name,
   description: toolDescriptions[name as keyof typeof toolDescriptions],
   parameters,
+  strict: true as const,
 }));
+
+const responsesTools = openAiTools;
 
 const claudeTools = Object.entries(toolParameters).map(([name, input_schema]) => ({
   name,
@@ -312,6 +314,54 @@ const parseAttemptedProviders = (value?: string | null): string[] => {
 const formatRoute = (provider?: string | null, model?: string | null) =>
   provider && model ? `${provider}/${model}` : provider || model || 'Pending';
 
+const formatToolCallMessage = (toolCall: PlaygroundToolCall) =>
+  `Browser tool call · ${toolCall.name}\nArguments\n${toolCall.arguments}\nResult\n${toolCall.result}`;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+// Deep Chat follows a browser tool call with another request containing its tool
+// result. That follow-up must not reset the routing panel (or its tool details).
+// Each supported API encodes the result differently.
+const isToolContinuationRequest = (body: unknown) => {
+  if (!isRecord(body)) return false;
+
+  const messages = body.messages;
+  if (Array.isArray(messages)) {
+    const lastMessage = messages.at(-1);
+    if (
+      isRecord(lastMessage) &&
+      (lastMessage.role === 'tool' ||
+        (Array.isArray(lastMessage.content) &&
+          lastMessage.content.some((block) => isRecord(block) && block.type === 'tool_result')))
+    ) {
+      return true;
+    }
+  }
+
+  const input = body.input;
+  if (
+    Array.isArray(input) &&
+    isRecord(input.at(-1)) &&
+    input.at(-1).type === 'function_call_output'
+  ) {
+    return true;
+  }
+
+  const contents = body.contents;
+  if (Array.isArray(contents) && isRecord(contents.at(-1))) {
+    const parts = contents.at(-1).parts;
+    if (
+      Array.isArray(parts) &&
+      parts.some((part) => isRecord(part) && 'functionResponse' in part)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 type ChatSimulationProps = {
   selectedKey: KeyConfig;
   selectedModel: string;
@@ -330,6 +380,7 @@ const ChatSimulation = memo(
     onRoutingPending,
     onToolCalls,
   }: ChatSimulationProps) => {
+    const chatRef = useRef<DeepChatElement>(null);
     const tasksRef = useRef<string[]>([]);
     const pendingOpenAiToolCallsRef = useRef(false);
     const runBrowserTools = (calls: BrowserToolCall[]) => {
@@ -378,31 +429,30 @@ const ChatSimulation = memo(
             return { response: JSON.stringify({ error: `Unknown browser tool: ${call.name}` }) };
         }
       });
-      window.setTimeout(
-        () =>
-          onToolCalls(
-            calls.map((call, index) => ({
-              name: call.name,
-              arguments: call.arguments,
-              result: results[index]?.response ?? '',
-            }))
-          ),
-        0
-      );
+      const completedCalls = calls.map((call, index) => ({
+        name: call.name,
+        arguments: call.arguments,
+        result: results[index]?.response ?? '',
+      }));
+
+      // Deep Chat handles tool execution internally but does not add an entry to
+      // its transcript. Add a non-sendable AI message so the action appears
+      // between the user's prompt and the model's follow-up response.
+      for (const toolCall of completedCalls) {
+        chatRef.current?.addMessage({
+          role: 'ai',
+          text: formatToolCallMessage(toolCall),
+        });
+      }
+      window.setTimeout(() => onToolCalls(completedCalls), 0);
       return results;
     };
 
     const requestInterceptor = (details: { body: unknown; headers?: Record<string, string> }) => {
       const clientRequestId = crypto.randomUUID();
-      const messages =
-        details.body && typeof details.body === 'object' && 'messages' in details.body
-          ? (details.body as { messages?: Array<{ role?: string }> }).messages
-          : undefined;
-      const isToolContinuation =
-        messages !== undefined &&
-        messages.length > 0 &&
-        messages[messages.length - 1]?.role === 'tool';
-      if (!isToolContinuation) window.setTimeout(() => onRoutingPending(clientRequestId), 0);
+      if (!isToolContinuationRequest(details.body)) {
+        window.setTimeout(() => onRoutingPending(clientRequestId), 0);
+      }
       return {
         ...details,
         headers: {
@@ -413,7 +463,7 @@ const ChatSimulation = memo(
       };
     };
 
-    const responseInterceptor = (response: unknown) => {
+    const responseInterceptor: NonNullable<DeepChatElement['responseInterceptor']> = (response) => {
       // Deep Chat 2.4.x starts its browser-side tool continuation only when the
       // terminal OpenAI chunk says `tool_calls`. Plexus-compatible streams may
       // validly finish with `stop` after emitting tool deltas, so normalize that
@@ -433,7 +483,7 @@ const ChatSimulation = memo(
         return {
           ...(response as Record<string, unknown>),
           choices: [{ ...choice, finish_reason: 'tool_calls' }],
-        };
+        } as typeof response;
       }
       return response;
     };
@@ -518,6 +568,7 @@ const ChatSimulation = memo(
 
     return (
       <DeepChat
+        ref={chatRef}
         key={`${selectedKey.key}:${selectedModel}:${selectedApi}:${toolMode}`}
         connect={connection.connect}
         directConnection={connection.directConnection}
