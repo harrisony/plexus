@@ -256,19 +256,11 @@ tags:
       Upstream provider quota checkers (`checkerId`-based).
 
       Each checker periodically polls an upstream provider for its current
-      quota utilisation and stores a `QuotaSample` snapshot.
-
-      ### Window types
-
-      | Window Type | Description |
-      |---|---|
-      | `subscription` | Monthly/billing-cycle quota or prepaid balance. |
-      | `hourly` | Hourly rolling window. |
-      | `five_hour` | 5-hour rolling window (common across multiple providers). |
-      | `daily` | Daily reset quota. |
-      | `weekly` | 7-day rolling window (common across multiple providers). |
-      | `monthly` | Calendar month quota. |
-      | `custom` | Provider-specific window. |
+      quota utilisation and persists a `Meter` snapshot (one row per meter).
+      Each meter is identified by a provider-specific `meterKey` (e.g.
+      `balance`, `five_hour`, `daily`) rather than a fixed window-type enum.
+      Use `GET /quotas/{checkerId}/history?meterKey=...` for historical rows,
+      and `GET /quotas/{checkerId}` for the latest meter readings.
 
       ### Status thresholds
 
