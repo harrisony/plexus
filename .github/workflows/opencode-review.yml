@@ -16,8 +16,26 @@ jobs:
     permissions:
       actions: write
       contents: none
+      statuses: write
 
     steps:
+      # Post a pending status immediately so the PR does not read as reviewed/safe before the
+      # actual review (opencode-review-run.yml) has run. That workflow updates this same status
+      # to success/failure/error, and points it at its own run, so the check stays tied to the PR.
+      - name: Mark review as pending
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: 'pending',
+              context: 'OpenCode Review',
+              description: 'Review queued',
+              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/opencode-review-run.yml`,
+            });
+
       # This privileged trigger never checks out or inspects pull-request content. It forwards only
       # immutable PR identifiers to a trusted workflow_dispatch run from the default branch, because
       # the opencode action does not support pull_request_target as an event type.
