@@ -425,6 +425,14 @@ paths:
     $ref: paths/v0_management_config_exploration-rate.yaml
   /v0/management/config/failover:
     $ref: paths/v0_management_config_failover.yaml
+  /v0/management/config/capture-trace-on-error:
+    $ref: paths/v0_management_config_capture-trace-on-error.yaml
+  /v0/management/config/trusted-proxies:
+    $ref: paths/v0_management_config_trusted-proxies.yaml
+  /v0/management/config/compaction:
+    $ref: paths/v0_management_config_compaction.yaml
+  /v0/management/config/mcp-enabled:
+    $ref: paths/v0_management_config_mcp-enabled.yaml
   /v0/management/system-settings:
     $ref: paths/v0_management_system-settings.yaml
   /v0/management/providers:
@@ -461,6 +469,16 @@ paths:
     $ref: paths/v0_management_mcp-servers.yaml
   /v0/management/mcp-servers/{serverName}:
     $ref: paths/v0_management_mcp-servers_{serverName}.yaml
+  /v0/management/mcp-servers/{serverName}/status:
+    $ref: paths/v0_management_mcp-servers_{serverName}_status.yaml
+  /v0/management/mcp-servers/{serverName}/start:
+    $ref: paths/v0_management_mcp-servers_{serverName}_start.yaml
+  /v0/management/mcp-servers/{serverName}/stop:
+    $ref: paths/v0_management_mcp-servers_{serverName}_stop.yaml
+  /v0/management/mcp-servers/{serverName}/restart:
+    $ref: paths/v0_management_mcp-servers_{serverName}_restart.yaml
+  /v0/management/mcp-servers/{serverName}/process-logs:
+    $ref: paths/v0_management_mcp-servers_{serverName}_process-logs.yaml
   /v0/management/quota-checker-types:
     $ref: paths/v0_management_quota-checker-types.yaml
   /v0/management/quota-checkers:
@@ -531,6 +549,8 @@ paths:
     $ref: paths/v0_management_user-quotas_{name}.yaml
   /v0/management/quota/clear:
     $ref: paths/v0_management_quota_clear.yaml
+  /v0/management/quota/recompute:
+    $ref: paths/v0_management_quota_recompute.yaml
   /v0/management/quota/status/{key}:
     $ref: paths/v0_management_quota_status_{key}.yaml
   /v0/management/test:
@@ -551,6 +571,8 @@ paths:
     $ref: paths/v0_system_logs_recent.yaml
   /mcp/{name}:
     $ref: paths/mcp_{name}.yaml
+  /mcp/plexus:
+    $ref: paths/mcp_plexus.yaml
   /.well-known/oauth-authorization-server:
     $ref: paths/.well-known_oauth-authorization-server.yaml
   /.well-known/oauth-protected-resource:
